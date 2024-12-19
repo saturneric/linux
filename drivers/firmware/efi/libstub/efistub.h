@@ -314,7 +314,9 @@ union efi_boot_services {
 		void *close_protocol;
 		void *open_protocol_information;
 		void *protocols_per_handle;
-		void *locate_handle_buffer;
+		efi_status_t (__efiapi *locate_handle_buffer)(int, efi_guid_t *,
+							      void *, unsigned long *,
+							      efi_handle_t **);
 		efi_status_t (__efiapi *locate_protocol)(efi_guid_t *, void *,
 							 void **);
 		efi_status_t (__efiapi *install_multiple_protocol_interfaces)(efi_handle_t *, ...);
@@ -1083,8 +1085,7 @@ efi_status_t efi_parse_options(char const *cmdline);
 
 void efi_parse_option_graphics(char *option);
 
-efi_status_t efi_setup_gop(struct screen_info *si, efi_guid_t *proto,
-			   unsigned long size);
+efi_status_t efi_setup_gop(struct screen_info *si);
 
 efi_status_t handle_cmdline_files(efi_loaded_image_t *image,
 				  const efi_char16_t *optstr,
