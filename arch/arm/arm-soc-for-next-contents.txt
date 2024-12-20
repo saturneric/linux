@@ -1,0 +1,43 @@
+soc/arm
+
+soc/dt
+	patch
+		ARM: dts: nuvoton: Fix at24 EEPROM node names
+	stm32/dt
+		https://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32 tags/stm32-dt-for-v6.14-1
+	renesas/dt
+		https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-devel tags/renesas-dts-for-v6.14-tag1
+
+soc/drivers
+	<no branch> (12e0bd600e3c2f33f9db0e3b91f6b8d8d95b7dbe)
+		https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-devel tags/renesas-drivers-for-v6.14-tag1
+
+soc/defconfig
+	patch
+		arm64: defconfig: Enable Amazon Elastic Network Adaptor
+	renesas/defconfig
+		https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-devel tags/renesas-arm-defconfig-for-v6.14-tag1
+
+soc/late
+
+arm/fixes
+	<no branch> (4f776d81bf927a4f25d5e32a4d0df08ee509dd6c)
+		https://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux tags/juno-fix-6.13
+	<no branch> (514b2262ade48a0503ac6aa03c3bfb8c5be69b21)
+		https://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux tags/scmi-fix-6.13
+	<no branch> (6fe437cfe2cdc797b03f63b338a13fac96ed6a08)
+		https://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux tags/ffa-fix-6.13
+	<no branch> (48808b55b07c3cea64805267a5547f03e6452a9f)
+		https://git.kernel.org/pub/scm/linux/kernel/git/conor/linux tags/riscv-soc-fixes-for-v6.13-rc4
+	<no branch> (058387d9c6b70e225da82492e1e193635c3fac3f)
+		https://github.com/Broadcom/stblinux tags/arm-soc/for-6.13/devicetree-arm64-fixes
+
+soc/newsoc
+	patch
+		dt-bindings: Add Blaize vendor prefix
+		dt-bindings: arm: blaize: Add Blaize BLZP1600 SoC
+		arm64: Add Blaize BLZP1600 SoC family
+		arm64: dts: Add initial support for Blaize BLZP1600 CB2
+		arm64: defconfig: Enable Blaize BLZP1600 platform
+		MAINTAINER: Add entry for Blaize SoC
+
