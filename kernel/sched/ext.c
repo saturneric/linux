@@ -2747,6 +2747,7 @@ static int balance_one(struct rq *rq, struct task_struct *prev)
 {
 	struct scx_dsp_ctx *dspc = this_cpu_ptr(scx_dsp_ctx);
 	bool prev_on_scx = prev->sched_class == &ext_sched_class;
+	bool prev_on_rq = prev->scx.flags & SCX_TASK_QUEUED;
 	int nr_loops = SCX_DSP_MAX_LOOPS;
 
 	lockdep_assert_rq_held(rq);
@@ -2779,8 +2780,7 @@ static int balance_one(struct rq *rq, struct task_struct *prev)
 		 * See scx_ops_disable_workfn() for the explanation on the
 		 * bypassing test.
 		 */
-		if ((prev->scx.flags & SCX_TASK_QUEUED) &&
-		    prev->scx.slice && !scx_rq_bypassing(rq)) {
+		if (prev_on_rq && prev->scx.slice && !scx_rq_bypassing(rq)) {
 			rq->scx.flags |= SCX_RQ_BAL_KEEP;
 			goto has_tasks;
 		}
@@ -2813,6 +2813,10 @@ static int balance_one(struct rq *rq, struct task_struct *prev)
 
 		flush_dispatch_buf(rq);
 
+		if (prev_on_rq && prev->scx.slice) {
+			rq->scx.flags |= SCX_RQ_BAL_KEEP;
+			goto has_tasks;
+		}
 		if (rq->scx.local_dsq.nr)
 			goto has_tasks;
 		if (consume_global_dsq(rq))
@@ -2838,8 +2842,7 @@ no_tasks:
 	 * Didn't find another task to run. Keep running @prev unless
 	 * %SCX_OPS_ENQ_LAST is in effect.
 	 */
-	if ((prev->scx.flags & SCX_TASK_QUEUED) &&
-	    (!static_branch_unlikely(&scx_ops_enq_last) ||
+	if (prev_on_rq && (!static_branch_unlikely(&scx_ops_enq_last) ||
 	     scx_rq_bypassing(rq))) {
 		rq->scx.flags |= SCX_RQ_BAL_KEEP;
 		goto has_tasks;
@@ -3034,7 +3037,7 @@ static void put_prev_task_scx(struct rq *rq, struct task_struct *p,
 		 */
 		if (p->scx.slice && !scx_rq_bypassing(rq)) {
 			dispatch_enqueue(&rq->scx.local_dsq, p, SCX_ENQ_HEAD);
-			return;
+			goto switch_class;
 		}
 
 		/*
@@ -3051,6 +3054,7 @@ static void put_prev_task_scx(struct rq *rq, struct task_struct *p,
 		}
 	}
 
+switch_class:
 	if (next && next->sched_class != &ext_sched_class)
 		switch_class(rq, next);
 }
@@ -4803,10 +4807,9 @@ static void scx_ops_bypass(bool bypass)
 	 */
 	for_each_possible_cpu(cpu) {
 		struct rq *rq = cpu_rq(cpu);
-		struct rq_flags rf;
 		struct task_struct *p, *n;
 
-		rq_lock(rq, &rf);
+		raw_spin_rq_lock(rq);
 
 		if (bypass) {
 			WARN_ON_ONCE(rq->scx.flags & SCX_RQ_BYPASSING);
@@ -4822,7 +4825,7 @@ static void scx_ops_bypass(bool bypass)
 		 * sees scx_rq_bypassing() before moving tasks to SCX.
 		 */
 		if (!scx_enabled()) {
-			rq_unlock(rq, &rf);
+			raw_spin_rq_unlock(rq);
 			continue;
 		}
 
@@ -4842,10 +4845,11 @@ static void scx_ops_bypass(bool bypass)
 			sched_enq_and_set_task(&ctx);
 		}
 
-		rq_unlock(rq, &rf);
-
 		/* resched to restore ticks and idle state */
-		resched_cpu(cpu);
+		if (cpu_online(cpu) || cpu == smp_processor_id())
+			resched_curr(rq);
+
+		raw_spin_rq_unlock(rq);
 	}
 
 	atomic_dec(&scx_ops_breather_depth);
