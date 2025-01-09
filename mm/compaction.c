@@ -83,6 +83,7 @@ static inline bool is_via_compact_memory(int order) { return false; }
 static struct page *mark_allocated_noprof(struct page *page, unsigned int order, gfp_t gfp_flags)
 {
 	post_alloc_hook(page, order, __GFP_MOVABLE);
+	set_page_refcounted(page);
 	return page;
 }
 #define mark_allocated(...)	alloc_hooks(mark_allocated_noprof(__VA_ARGS__))
@@ -1868,6 +1869,7 @@ again:
 	dst = (struct folio *)freepage;
 
 	post_alloc_hook(&dst->page, order, __GFP_MOVABLE);
+	set_page_refcounted(&dst->page);
 	if (order)
 		prep_compound_page(&dst->page, order);
 	cc->nr_freepages -= 1 << order;
@@ -2381,7 +2383,27 @@ static bool __compaction_suitable(struct zone *zone, int order,
 				  int highest_zoneidx,
 				  unsigned long wmark_target)
 {
+	pg_data_t __maybe_unused *pgdat = zone->zone_pgdat;
+	unsigned long sum, nr_pinned;
 	unsigned long watermark;
+
+	sum = node_page_state(pgdat, NR_INACTIVE_FILE) +
+		node_page_state(pgdat, NR_INACTIVE_ANON) +
+		node_page_state(pgdat, NR_ACTIVE_FILE) +
+		node_page_state(pgdat, NR_ACTIVE_ANON) +
+		node_page_state(pgdat, NR_UNEVICTABLE);
+
+	nr_pinned = node_page_state(pgdat, NR_FOLL_PIN_ACQUIRED) -
+		node_page_state(pgdat, NR_FOLL_PIN_RELEASED);
+
+	/*
+	 * Gup-pinned pages are non-migratable. After subtracting these pages,
+	 * we need to check if the remaining pages are sufficient for memory
+	 * compaction.
+	 */
+	if ((sum - nr_pinned) < (1 << order))
+		return false;
+
 	/*
 	 * Watermarks for order-0 must be met for compaction to be able to
 	 * isolate free pages for migration targets. This means that the
