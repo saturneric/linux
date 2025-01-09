@@ -782,7 +782,7 @@ static inline int __bch2_trans_relock(struct btree_trans *trans, bool trace)
 			return bch2_trans_relock_fail(trans, path, &f, trace);
 	}
 
-	trans_set_locked(trans);
+	trans_set_locked(trans, true);
 out:
 	bch2_trans_verify_locks(trans);
 	return 0;
@@ -816,6 +816,17 @@ void bch2_trans_unlock_long(struct btree_trans *trans)
 {
 	bch2_trans_unlock(trans);
 	bch2_trans_srcu_unlock(trans);
+}
+
+void bch2_trans_unlock_write(struct btree_trans *trans)
+{
+	struct btree_path *path;
+	unsigned i;
+
+	trans_for_each_path(trans, path, i)
+		for (unsigned l = 0; l < BTREE_MAX_DEPTH; l++)
+			if (btree_node_write_locked(path, l))
+				bch2_btree_node_unlock_write(trans, path, path->l[l].b);
 }
 
 int __bch2_trans_mutex_lock(struct btree_trans *trans,
@@ -856,6 +867,9 @@ void bch2_btree_path_verify_locks(struct btree_path *path)
 		       (want == BTREE_NODE_UNLOCKED ||
 			have != BTREE_NODE_WRITE_LOCKED) &&
 		       want != have);
+
+		BUG_ON(btree_node_locked(path, l) &&
+		       path->l[l].lock_seq != six_lock_seq(&path->l[l].b->c.lock));
 	}
 }
 
