@@ -189,7 +189,7 @@ impl CStr {
         // to a `NUL`-terminated C string.
         let len = unsafe { bindings::strlen(ptr) } + 1;
         // SAFETY: Lifetime guaranteed by the safety precondition.
-        let bytes = unsafe { core::slice::from_raw_parts(ptr as _, len as _) };
+        let bytes = unsafe { core::slice::from_raw_parts(ptr as _, len) };
         // SAFETY: As `len` is returned by `strlen`, `bytes` does not contain interior `NUL`.
         // As we have added 1 to `len`, the last byte is known to be `NUL`.
         unsafe { Self::from_bytes_with_nul_unchecked(bytes) }
@@ -248,7 +248,7 @@ impl CStr {
     /// Returns a C pointer to the string.
     #[inline]
     pub const fn as_char_ptr(&self) -> *const crate::ffi::c_char {
-        self.0.as_ptr() as _
+        self.0.as_ptr()
     }
 
     /// Convert the string to a byte slice without the trailing `NUL` byte.
@@ -522,6 +522,7 @@ macro_rules! c_str {
 }
 
 #[cfg(test)]
+#[expect(clippy::items_after_test_module)]
 mod tests {
     use super::*;
 
@@ -547,7 +548,7 @@ mod tests {
         })
     }
 
-    const ALL_ASCII_CHARS: &'static str =
+    const ALL_ASCII_CHARS: &str =
         "\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\x09\\x0a\\x0b\\x0c\\x0d\\x0e\\x0f\
         \\x10\\x11\\x12\\x13\\x14\\x15\\x16\\x17\\x18\\x19\\x1a\\x1b\\x1c\\x1d\\x1e\\x1f \
         !\"#$%&'()*+,-./0123456789:;<=>?@\
@@ -581,6 +582,7 @@ mod tests {
     fn test_cstr_as_str_unchecked() {
         let good_bytes = b"\xf0\x9f\x90\xA7\0";
         let checked_cstr = CStr::from_bytes_with_nul(good_bytes).unwrap();
+        // SAFETY: The contents come from a string literal which contains valid UTF-8.
         let unchecked_str = unsafe { checked_cstr.as_str_unchecked() };
         assert_eq!(unchecked_str, "🐧");
     }
@@ -838,7 +840,7 @@ impl CString {
         // SAFETY: The buffer is valid for read because `f.bytes_written()` is bounded by `size`
         // (which the minimum buffer size) and is non-zero (we wrote at least the `NUL` terminator)
         // so `f.bytes_written() - 1` doesn't underflow.
-        let ptr = unsafe { bindings::memchr(buf.as_ptr().cast(), 0, (f.bytes_written() - 1) as _) };
+        let ptr = unsafe { bindings::memchr(buf.as_ptr().cast(), 0, f.bytes_written() - 1) };
         if !ptr.is_null() {
             return Err(EINVAL);
         }
