@@ -10,7 +10,6 @@
 
 /* base module includes */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/init.h>
@@ -25,7 +24,6 @@
 #include <linux/timer.h>
 #include <linux/delay.h>
 #include <linux/sched/signal.h>
-#include <linux/uaccess.h>
 #include <linux/usb.h>
 
 #include "gpibP.h"
@@ -1181,7 +1179,11 @@ static int usb_gpib_init_module(struct usb_interface *interface)
 		return rv;
 
 	if (!assigned_usb_minors) {
-		gpib_register_driver(&usb_gpib_interface, THIS_MODULE);
+		rv = gpib_register_driver(&usb_gpib_interface, THIS_MODULE);
+		if (rv) {
+			pr_err("lpvo_usb_gpib: gpib_register_driver failed: error = %d\n", rv);
+			goto exit;
+		}
 	} else {
 		/* check if minor is already registered - maybe useless, but if
 		 *  it happens the code is inconsistent somewhere
