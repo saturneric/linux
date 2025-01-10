@@ -131,6 +131,10 @@ static bool blk_freeze_set_owner(struct request_queue *q,
 	if (!q->mq_freeze_depth) {
 		q->mq_freeze_owner = owner;
 		q->mq_freeze_owner_depth = 1;
+		q->mq_freeze_disk_dead = !q->disk ||
+			test_bit(GD_DEAD, &q->disk->state) ||
+			!blk_queue_registered(q);
+		q->mq_freeze_queue_dying = blk_queue_dying(q);
 		return true;
 	}
 
@@ -142,8 +146,6 @@ static bool blk_freeze_set_owner(struct request_queue *q,
 /* verify the last unfreeze in owner context */
 static bool blk_unfreeze_check_owner(struct request_queue *q)
 {
-	if (!q->mq_freeze_owner)
-		return false;
 	if (q->mq_freeze_owner != current)
 		return false;
 	if (--q->mq_freeze_owner_depth == 0) {
@@ -189,7 +191,7 @@ bool __blk_freeze_queue_start(struct request_queue *q,
 void blk_freeze_queue_start(struct request_queue *q)
 {
 	if (__blk_freeze_queue_start(q, current))
-		blk_freeze_acquire_lock(q, false, false);
+		blk_freeze_acquire_lock(q);
 }
 EXPORT_SYMBOL_GPL(blk_freeze_queue_start);
 
@@ -237,7 +239,7 @@ bool __blk_mq_unfreeze_queue(struct request_queue *q, bool force_atomic)
 void blk_mq_unfreeze_queue(struct request_queue *q)
 {
 	if (__blk_mq_unfreeze_queue(q, false))
-		blk_unfreeze_release_lock(q, false, false);
+		blk_unfreeze_release_lock(q);
 }
 EXPORT_SYMBOL_GPL(blk_mq_unfreeze_queue);
 
@@ -2656,8 +2658,10 @@ static void blk_mq_bio_to_request(struct request *rq, struct bio *bio,
 	if (bio->bi_opf & REQ_RAHEAD)
 		rq->cmd_flags |= REQ_FAILFAST_MASK;
 
+	rq->bio = rq->biotail = bio;
 	rq->__sector = bio->bi_iter.bi_sector;
-	blk_rq_bio_prep(rq, bio, nr_segs);
+	rq->__data_len = bio->bi_iter.bi_size;
+	rq->nr_phys_segments = nr_segs;
 	if (bio_integrity(bio))
 		rq->nr_integrity_segments = blk_rq_count_integrity_sg(rq->q,
 								      bio);
@@ -3472,8 +3476,7 @@ static struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 	if (node == NUMA_NO_NODE)
 		node = set->numa_node;
 
-	tags = blk_mq_init_tags(nr_tags, reserved_tags, node,
-				BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags));
+	tags = blk_mq_init_tags(nr_tags, reserved_tags, set->flags, node);
 	if (!tags)
 		return NULL;
 
