@@ -36,6 +36,7 @@ static void spmi_ctrl_release(struct device *dev)
 	struct spmi_controller *ctrl = to_spmi_controller(dev);
 
 	ida_free(&ctrl_ida, ctrl->nr);
+	of_node_put(dev->of_node);
 	kfree(ctrl);
 }
 
@@ -458,7 +459,7 @@ struct spmi_controller *spmi_controller_alloc(struct device *parent,
 	ctrl->dev.type = &spmi_ctrl_type;
 	ctrl->dev.bus = &spmi_bus_type;
 	ctrl->dev.parent = parent;
-	ctrl->dev.of_node = parent->of_node;
+	device_set_node(&ctrl->dev, of_fwnode_handle(of_node_get(parent->of_node)));
 	spmi_controller_set_drvdata(ctrl, &ctrl[1]);
 
 	id = ida_alloc(&ctrl_ida, GFP_KERNEL);
@@ -517,7 +518,7 @@ static void of_spmi_register_devices(struct spmi_controller *ctrl)
 		if (!sdev)
 			continue;
 
-		sdev->dev.of_node = node;
+		device_set_node(&sdev->dev, of_fwnode_handle(node));
 		sdev->usid = (u8)reg[0];
 
 		err = spmi_device_add(sdev);

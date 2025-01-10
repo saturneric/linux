@@ -1746,7 +1746,6 @@ static int spmi_pmic_arb_bus_init(struct platform_device *pdev,
 	irq_set_chained_handler_and_data(bus->irq,
 					 pmic_arb_chained_irq, bus);
 
-	ctrl->dev.of_node = node;
 	dev_set_name(&ctrl->dev, "spmi-%d", bus_index);
 
 	ret = devm_spmi_controller_add(dev, ctrl);
