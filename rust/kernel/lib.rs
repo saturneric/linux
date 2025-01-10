@@ -18,6 +18,11 @@
 #![feature(inline_const)]
 #![feature(lint_reasons)]
 #![feature(unsize)]
+// Stable in Rust 1.83
+#![feature(const_maybe_uninit_as_mut_ptr)]
+#![feature(const_mut_refs)]
+#![feature(const_ptr_write)]
+#![feature(const_refs_to_cell)]
 
 // Ensure conditional compilation based on the kernel configuration works;
 // otherwise we may silently break things like initcall handling.
@@ -35,11 +40,15 @@ pub mod block;
 mod build_assert;
 pub mod cred;
 pub mod device;
+pub mod device_id;
+pub mod devres;
+pub mod driver;
 pub mod error;
 #[cfg(CONFIG_RUST_FW_LOADER_ABSTRACTIONS)]
 pub mod firmware;
 pub mod fs;
 pub mod init;
+pub mod io;
 pub mod ioctl;
 pub mod jump_label;
 #[cfg(CONFIG_KUNIT)]
@@ -48,11 +57,16 @@ pub mod list;
 pub mod miscdevice;
 #[cfg(CONFIG_NET)]
 pub mod net;
+pub mod of;
 pub mod page;
+#[cfg(CONFIG_PCI)]
+pub mod pci;
 pub mod pid_namespace;
+pub mod platform;
 pub mod prelude;
 pub mod print;
 pub mod rbtree;
+pub mod revocable;
 pub mod security;
 pub mod seq_file;
 pub mod sizes;
@@ -114,6 +128,12 @@ impl<T: Module> InPlaceModule for T {
         // SAFETY: On success, `initer` always fully initialises an instance of `Self`.
         unsafe { init::pin_init_from_closure(initer) }
     }
+}
+
+/// Metadata attached to a [`Module`] or [`InPlaceModule`].
+pub trait ModuleMetadata {
+    /// The name of the module as specified in the `module!` macro.
+    const NAME: &'static crate::str::CStr;
 }
 
 /// Equivalent to `THIS_MODULE` in the C API.
