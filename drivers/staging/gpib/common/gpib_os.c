@@ -116,56 +116,6 @@ int io_timed_out(gpib_board_t *board)
 	return 0;
 }
 
-void writeb_wrapper(unsigned int value, void *address)
-{
-	writeb(value, address);
-};
-EXPORT_SYMBOL(writeb_wrapper);
-
-void writew_wrapper(unsigned int value, void *address)
-{
-	writew(value, address);
-};
-EXPORT_SYMBOL(writew_wrapper);
-
-unsigned int readb_wrapper(void *address)
-{
-	return readb(address);
-};
-EXPORT_SYMBOL(readb_wrapper);
-
-unsigned int readw_wrapper(void *address)
-{
-	return readw(address);
-};
-EXPORT_SYMBOL(readw_wrapper);
-
-#ifdef CONFIG_HAS_IOPORT
-void outb_wrapper(unsigned int value, void *address)
-{
-	outb(value, (unsigned long)(address));
-};
-EXPORT_SYMBOL(outb_wrapper);
-
-void outw_wrapper(unsigned int value, void *address)
-{
-	outw(value, (unsigned long)(address));
-};
-EXPORT_SYMBOL(outw_wrapper);
-
-unsigned int inb_wrapper(void *address)
-{
-	return inb((unsigned long)(address));
-};
-EXPORT_SYMBOL(inb_wrapper);
-
-unsigned int inw_wrapper(void *address)
-{
-	return inw((unsigned long)(address));
-};
-EXPORT_SYMBOL(inw_wrapper);
-#endif
-
 /* this is a function instead of a constant because of Suse
  * defining HZ to be a function call to get_hz()
  */
@@ -536,7 +486,7 @@ int dvrsp(gpib_board_t *board, unsigned int pad, int sad,
 		return -1;
 	}
 
-	if (pad > MAX_GPIB_PRIMARY_ADDRESS || sad > MAX_GPIB_SECONDARY_ADDRESS) {
+	if (pad > MAX_GPIB_PRIMARY_ADDRESS || sad > MAX_GPIB_SECONDARY_ADDRESS || sad < -1) {
 		pr_err("gpib: bad address for serial poll");
 		return -1;
 	}
@@ -1623,7 +1573,7 @@ static int iobase_ioctl(gpib_board_config_t *config, unsigned long arg)
 
 	if (WARN_ON_ONCE(sizeof(void *) > sizeof(base_addr)))
 		return -EFAULT;
-	config->ibbase = (void *)(unsigned long)(base_addr);
+	config->ibbase = base_addr;
 
 	return 0;
 }
@@ -2094,18 +2044,19 @@ void init_gpib_descriptor(gpib_descriptor_t *desc)
 	atomic_set(&desc->io_in_progress, 0);
 }
 
-void gpib_register_driver(gpib_interface_t *interface, struct module *provider_module)
+int gpib_register_driver(gpib_interface_t *interface, struct module *provider_module)
 {
 	struct gpib_interface_list_struct *entry;
 
 	entry = kmalloc(sizeof(*entry), GFP_KERNEL);
 	if (!entry)
-		return;
+		return -ENOMEM;
 
 	entry->interface = interface;
 	entry->module = provider_module;
 	list_add(&entry->list, &registered_drivers);
-	pr_info("gpib: registered %s interface\n", interface->name);
+
+	return 0;
 }
 EXPORT_SYMBOL(gpib_register_driver);
 

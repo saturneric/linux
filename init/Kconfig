@@ -894,6 +894,9 @@ config ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
 config CC_HAS_INT128
 	def_bool !$(cc-option,$(m64-flag) -D__SIZEOF_INT128__=0) && 64BIT
 
+config CC_HAS_TYPEOF_UNQUAL
+	def_bool $(success,echo 'int foo (int a) { __typeof_unqual__(a) b = a; return b; }' | $(CC) -x c - -S -o /dev/null)
+
 config CC_IMPLICIT_FALLTHROUGH
 	string
 	default "-Wimplicit-fallthrough=5" if CC_IS_GCC && $(cc-option,-Wimplicit-fallthrough=5)
@@ -1989,8 +1992,10 @@ config BINDGEN_VERSION_TEXT
 	string
 	depends on RUST
 	# The dummy parameter `workaround-for-0.69.0` is required to support 0.69.0
-	# (https://github.com/rust-lang/rust-bindgen/pull/2678). It can be removed when
-	# the minimum version is upgraded past that (0.69.1 already fixed the issue).
+	# (https://github.com/rust-lang/rust-bindgen/pull/2678) and 0.71.0
+	# (https://github.com/rust-lang/rust-bindgen/pull/3040). It can be removed
+	# when the minimum version is upgraded past the latter (0.69.1 and 0.71.1
+	# both fixed the issue).
 	default "$(shell,$(BINDGEN) --version workaround-for-0.69.0 2>/dev/null)"
 
 #

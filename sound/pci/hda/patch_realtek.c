@@ -890,9 +890,7 @@ static void alc_ssid_check(struct hda_codec *codec, const hda_nid_t *ports)
 	}
 }
 
-/*
- */
-
+/* inverted digital-mic */
 static void alc_fixup_inv_dmic(struct hda_codec *codec,
 			       const struct hda_fixup *fix, int action)
 {
@@ -5902,7 +5900,7 @@ static void alc_determine_headset_type(struct hda_codec *codec)
 	}
 
 	codec_dbg(codec, "Headset jack detected iPhone-style headset: %s\n",
-		    is_ctia ? "yes" : "no");
+		  str_yes_no(is_ctia));
 	spec->current_headset_type = is_ctia ? ALC_HEADSET_TYPE_CTIA : ALC_HEADSET_TYPE_OMTP;
 }
 

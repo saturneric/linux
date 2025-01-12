@@ -110,6 +110,7 @@ enum pageflags {
 	PG_reclaim,		/* To be reclaimed asap */
 	PG_swapbacked,		/* Page is backed by RAM/swap */
 	PG_unevictable,		/* Page is "unevictable"  */
+	PG_dropbehind,		/* drop pages on IO completion */
 #ifdef CONFIG_MMU
 	PG_mlocked,		/* Page is vma mlocked */
 #endif
@@ -225,10 +226,47 @@ static __always_inline const struct page *page_fixed_fake_head(const struct page
 	}
 	return page;
 }
+
+static __always_inline bool page_count_writable(const struct page *page, int u)
+{
+	if (!static_branch_unlikely(&hugetlb_optimize_vmemmap_key))
+		return true;
+
+	/*
+	 * The refcount check is ordered before the fake-head check to prevent
+	 * the following race:
+	 *   CPU 1 (HVO)                     CPU 2 (speculative PFN walker)
+	 *
+	 *   page_ref_freeze()
+	 *   synchronize_rcu()
+	 *                                   rcu_read_lock()
+	 *                                   page_is_fake_head() is false
+	 *   vmemmap_remap_pte()
+	 *   XXX: struct page[] becomes r/o
+	 *
+	 *   page_ref_unfreeze()
+	 *                                   page_ref_count() is not zero
+	 *
+	 *                                   atomic_add_unless(&page->_refcount)
+	 *                                   XXX: try to modify r/o struct page[]
+	 *
+	 * The refcount check also prevents modification attempts to other (r/o)
+	 * tail pages that are not fake heads.
+	 */
+	if (atomic_read_acquire(&page->_refcount) == u)
+		return false;
+
+	return page_fixed_fake_head(page) == page;
+}
 #else
 static inline const struct page *page_fixed_fake_head(const struct page *page)
 {
 	return page;
+}
+
+static inline bool page_count_writable(const struct page *page, int u)
+{
+	return true;
 }
 #endif
 
@@ -561,6 +599,10 @@ PAGEFLAG(Reclaim, reclaim, PF_NO_TAIL)
 	TESTCLEARFLAG(Reclaim, reclaim, PF_NO_TAIL)
 FOLIO_FLAG(readahead, FOLIO_HEAD_PAGE)
 	FOLIO_TEST_CLEAR_FLAG(readahead, FOLIO_HEAD_PAGE)
+
+FOLIO_FLAG(dropbehind, FOLIO_HEAD_PAGE)
+	FOLIO_TEST_CLEAR_FLAG(dropbehind, FOLIO_HEAD_PAGE)
+	__FOLIO_SET_FLAG(dropbehind, FOLIO_HEAD_PAGE)
 
 #ifdef CONFIG_HIGHMEM
 /*

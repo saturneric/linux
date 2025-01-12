@@ -700,7 +700,7 @@ static int agilent_82350b_generic_attach(gpib_board_t *board, const gpib_board_c
 							     GPIB_82350A_REGION));
 		dev_dbg(board->gpib_dev, "%s: gpib base address remapped to 0x%p\n",
 			driver_name, a_priv->gpib_base);
-		tms_priv->iobase = a_priv->gpib_base + TMS9914_BASE_REG;
+		tms_priv->mmiobase = a_priv->gpib_base + TMS9914_BASE_REG;
 		a_priv->sram_base = ioremap(pci_resource_start(a_priv->pci_device,
 							       SRAM_82350A_REGION),
 					    pci_resource_len(a_priv->pci_device,
@@ -724,7 +724,7 @@ static int agilent_82350b_generic_attach(gpib_board_t *board, const gpib_board_c
 					    pci_resource_len(a_priv->pci_device, GPIB_REGION));
 		dev_dbg(board->gpib_dev, "%s: gpib base address remapped to 0x%p\n",
 			driver_name, a_priv->gpib_base);
-		tms_priv->iobase = a_priv->gpib_base + TMS9914_BASE_REG;
+		tms_priv->mmiobase = a_priv->gpib_base + TMS9914_BASE_REG;
 		a_priv->sram_base = ioremap(pci_resource_start(a_priv->pci_device, SRAM_REGION),
 					    pci_resource_len(a_priv->pci_device, SRAM_REGION));
 		dev_dbg(board->gpib_dev, "%s: sram base address remapped to 0x%p\n",
@@ -910,13 +910,30 @@ static int __init agilent_82350b_init_module(void)
 
 	result = pci_register_driver(&agilent_82350b_pci_driver);
 	if (result) {
-		pr_err("agilent_82350b: pci_driver_register failed!\n");
+		pr_err("agilent_82350b: pci_register_driver failed: error = %d\n", result);
 		return result;
 	}
 
-	gpib_register_driver(&agilent_82350b_unaccel_interface, THIS_MODULE);
-	gpib_register_driver(&agilent_82350b_interface, THIS_MODULE);
+	result = gpib_register_driver(&agilent_82350b_unaccel_interface, THIS_MODULE);
+	if (result) {
+		pr_err("agilent_82350b: gpib_register_driver failed: error = %d\n", result);
+		goto err_unaccel;
+	}
+
+	result = gpib_register_driver(&agilent_82350b_interface, THIS_MODULE);
+	if (result) {
+		pr_err("agilent_82350b: gpib_register_driver failed: error = %d\n", result);
+		goto err_interface;
+	}
+
 	return 0;
+
+err_interface:
+	gpib_unregister_driver(&agilent_82350b_unaccel_interface);
+err_unaccel:
+	pci_unregister_driver(&agilent_82350b_pci_driver);
+
+	return result;
 }
 
 static void __exit agilent_82350b_exit_module(void)

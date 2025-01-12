@@ -194,7 +194,6 @@ enum block_sequence_func {
 	DMUB_SUBVP_SAVE_SURF_ADDR,
 	HUBP_WAIT_FOR_DCC_META_PROP,
 	DMUB_FAMS2_GLOBAL_CONTROL_LOCK_FAST,
-
 };
 
 struct block_sequence {
@@ -330,10 +329,6 @@ struct hw_sequencer_funcs {
 			struct dc_state *context);
 	void (*disable_writeback)(struct dc *dc,
 			unsigned int dwb_pipe_inst);
-
-	bool (*mmhubbub_warmup)(struct dc *dc,
-			unsigned int num_dwb,
-			struct dc_writeback_info *wb_info);
 
 	/* Clock Related */
 	enum dc_status (*set_clock)(struct dc *dc,
@@ -489,11 +484,12 @@ void get_hdr_visual_confirm_color(
 void get_mpctree_visual_confirm_color(
 		struct pipe_ctx *pipe_ctx,
 		struct tg_color *color);
-
+void get_vabc_visual_confirm_color(
+	struct pipe_ctx *pipe_ctx,
+	struct tg_color *color);
 void get_subvp_visual_confirm_color(
 	struct pipe_ctx *pipe_ctx,
 	struct tg_color *color);
-
 void get_fams2_visual_confirm_color(
 	struct dc *dc,
 	struct dc_state *context,

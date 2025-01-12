@@ -772,6 +772,20 @@ static bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 	return result;
 }
 
+static bool dp_set_hblank_reduction_on_rx(struct pipe_ctx *pipe_ctx)
+{
+	struct dc *dc = pipe_ctx->stream->ctx->dc;
+	struct dc_stream_state *stream = pipe_ctx->stream;
+	bool result = false;
+
+	if (dc_is_virtual_signal(stream->signal))
+		result = true;
+	else
+		result = dm_helpers_dp_write_hblank_reduction(dc->ctx, stream);
+	return result;
+}
+
+
 /* The stream with these settings can be sent (unblanked) only after DSC was enabled on RX first,
  * i.e. after dp_enable_dsc_on_rx() had been called
  */
@@ -1953,6 +1967,10 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 		stream->phy_pix_clk = stream->timing.pix_clk_100hz / 10;
 	if (stream->phy_pix_clk > 340000)
 		is_over_340mhz = true;
+	if (dc_is_tmds_signal(stream->signal) && stream->phy_pix_clk > 6000000UL) {
+		ASSERT(false);
+		return;
+	}
 
 	if (dc_is_hdmi_signal(pipe_ctx->stream->signal)) {
 		unsigned short masked_chip_caps = pipe_ctx->stream->link->chip_caps &
@@ -2039,7 +2057,8 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 	/* Train with fallback when enabling DPIA link. Conventional links are
 	 * trained with fallback during sink detection.
 	 */
-	if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA)
+	if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA &&
+			!link->dc->config.enable_dpia_pre_training)
 		do_fallback = true;
 
 	/*
@@ -2593,6 +2612,9 @@ void link_set_dpms_on(
 			link_set_dsc_pps_packet(pipe_ctx, true, true);
 		}
 	}
+
+	if (dc_is_dp_signal(pipe_ctx->stream->signal))
+		dp_set_hblank_reduction_on_rx(pipe_ctx);
 
 	if (pipe_ctx->stream->link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA)
 		allocate_usb4_bandwidth(pipe_ctx->stream);

@@ -132,3 +132,22 @@ int nfs4_stat_to_errno(int stat)
 	return -stat;
 }
 EXPORT_SYMBOL_GPL(nfs4_stat_to_errno);
+
+/*
+ * Convert an errno to an NFS error code.
+ */
+__u32 errno_to_nfs4_stat(int errno)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(nfs4_errtbl); i++) {
+		if (nfs4_errtbl[i].errno == errno)
+			return nfs4_errtbl[i].stat;
+	}
+	/* If we cannot translate the error, the recovery routines should
+	 * handle it.
+	 * Note: remaining NFSv4 error codes have values > 10000, so should
+	 * not conflict with native Linux error codes.
+	 */
+	return NFS4ERR_SERVERFAULT;
+}
+EXPORT_SYMBOL_GPL(errno_to_nfs4_stat);

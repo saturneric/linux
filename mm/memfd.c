@@ -170,7 +170,7 @@ static int memfd_wait_for_pins(struct address_space *mapping)
 	return error;
 }
 
-unsigned int *memfd_file_seals_ptr(struct file *file)
+static unsigned int *memfd_file_seals_ptr(struct file *file)
 {
 	if (shmem_file(file))
 		return &SHMEM_I(file_inode(file))->seals;
@@ -327,16 +327,50 @@ static int check_sysctl_memfd_noexec(unsigned int *flags)
 	return 0;
 }
 
-SYSCALL_DEFINE2(memfd_create,
-		const char __user *, uname,
-		unsigned int, flags)
+static inline bool is_write_sealed(unsigned int seals)
 {
-	unsigned int *file_seals;
-	struct file *file;
-	int fd, error;
-	char *name;
-	long len;
+	return seals & (F_SEAL_WRITE | F_SEAL_FUTURE_WRITE);
+}
 
+static int check_write_seal(unsigned long *vm_flags_ptr)
+{
+	unsigned long vm_flags = *vm_flags_ptr;
+	unsigned long mask = vm_flags & (VM_SHARED | VM_WRITE);
+
+	/* If a private matting then writability is irrelevant. */
+	if (!(mask & VM_SHARED))
+		return 0;
+
+	/*
+	 * New PROT_WRITE and MAP_SHARED mmaps are not allowed when
+	 * write seals are active.
+	 */
+	if (mask & VM_WRITE)
+		return -EPERM;
+
+	/*
+	 * This is a read-only mapping, disallow mprotect() from making a
+	 * write-sealed mapping writable in future.
+	 */
+	*vm_flags_ptr &= ~VM_MAYWRITE;
+
+	return 0;
+}
+
+int memfd_check_seals_mmap(struct file *file, unsigned long *vm_flags_ptr)
+{
+	int err = 0;
+	unsigned int *seals_ptr = memfd_file_seals_ptr(file);
+	unsigned int seals = seals_ptr ? *seals_ptr : 0;
+
+	if (is_write_sealed(seals))
+		err = check_write_seal(vm_flags_ptr);
+
+	return err;
+}
+
+static int memfd_validate_flags(unsigned int flags)
+{
 	if (!(flags & MFD_HUGETLB)) {
 		if (flags & ~(unsigned int)MFD_ALL_FLAGS)
 			return -EINVAL;
@@ -351,38 +385,46 @@ SYSCALL_DEFINE2(memfd_create,
 	if ((flags & MFD_EXEC) && (flags & MFD_NOEXEC_SEAL))
 		return -EINVAL;
 
-	error = check_sysctl_memfd_noexec(&flags);
-	if (error < 0)
-		return error;
+	return check_sysctl_memfd_noexec(&flags);
+}
 
-	/* length includes terminating zero */
-	len = strnlen_user(uname, MFD_NAME_MAX_LEN + 1);
-	if (len <= 0)
-		return -EFAULT;
-	if (len > MFD_NAME_MAX_LEN + 1)
-		return -EINVAL;
+static char *memfd_create_name(const char __user *uname)
+{
+	int error;
+	char *name;
+	long len;
 
-	name = kmalloc(len + MFD_NAME_PREFIX_LEN, GFP_KERNEL);
+	name = kmalloc(MFD_NAME_PREFIX_LEN + MFD_NAME_MAX_LEN + 1, GFP_KERNEL);
 	if (!name)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	strcpy(name, MFD_NAME_PREFIX);
-	if (copy_from_user(&name[MFD_NAME_PREFIX_LEN], uname, len)) {
+	/* length does not include terminating zero */
+	len = strncpy_from_user(name + MFD_NAME_PREFIX_LEN, uname, MFD_NAME_MAX_LEN + 1);
+	if (len < 0) {
 		error = -EFAULT;
+		goto err_name;
+	} else if (len > MFD_NAME_MAX_LEN) {
+		error = -EINVAL;
 		goto err_name;
 	}
 
-	/* terminating-zero may have changed after strnlen_user() returned */
-	if (name[len + MFD_NAME_PREFIX_LEN - 1]) {
-		error = -EFAULT;
-		goto err_name;
-	}
+	return name;
 
-	fd = get_unused_fd_flags((flags & MFD_CLOEXEC) ? O_CLOEXEC : 0);
-	if (fd < 0) {
-		error = fd;
-		goto err_name;
-	}
+err_name:
+	kfree(name);
+	return ERR_PTR(error);
+}
+
+static struct file *memfd_file_create(const char *name, unsigned int flags)
+{
+	unsigned int *file_seals;
+	struct file *file;
+	int error;
+
+	error = memfd_validate_flags(flags);
+	if (error < 0)
+		return ERR_PTR(error);
 
 	if (flags & MFD_HUGETLB) {
 		file = hugetlb_file_setup(name, 0, VM_NORESERVE,
@@ -391,10 +433,8 @@ SYSCALL_DEFINE2(memfd_create,
 					MFD_HUGE_MASK);
 	} else
 		file = shmem_file_setup(name, 0, VM_NORESERVE);
-	if (IS_ERR(file)) {
-		error = PTR_ERR(file);
-		goto err_fd;
-	}
+	if (IS_ERR(file))
+		return file;
 	file->f_mode |= FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	file->f_flags |= O_LARGEFILE;
 
@@ -414,13 +454,32 @@ SYSCALL_DEFINE2(memfd_create,
 			*file_seals &= ~F_SEAL_SEAL;
 	}
 
-	fd_install(fd, file);
-	kfree(name);
-	return fd;
+	return file;
+}
 
-err_fd:
-	put_unused_fd(fd);
-err_name:
+SYSCALL_DEFINE2(memfd_create,
+		const char __user *, uname,
+		unsigned int, flags)
+{
+	struct file *file;
+	int fd;
+	char *name;
+
+	name = memfd_create_name(uname);
+	if (IS_ERR(name))
+		return PTR_ERR(name);
+
+	file = memfd_file_create(name, flags);
+	/* name is not needed beyond this point. */
 	kfree(name);
-	return error;
+	if (IS_ERR(file))
+		return PTR_ERR(file);
+
+	fd = get_unused_fd_flags((flags & MFD_CLOEXEC) ? O_CLOEXEC : 0);
+	if (fd >= 0)
+		fd_install(fd, file);
+	else
+		fput(file);
+
+	return fd;
 }

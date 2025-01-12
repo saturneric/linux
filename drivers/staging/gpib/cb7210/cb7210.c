@@ -971,12 +971,12 @@ int cb_pci_attach(gpib_board_t *board, const gpib_board_config_t *config)
 	switch (cb_priv->pci_chip) {
 	case PCI_CHIP_AMCC_S5933:
 		cb_priv->amcc_iobase = pci_resource_start(cb_priv->pci_device, 0);
-		nec_priv->iobase = (void *)(pci_resource_start(cb_priv->pci_device, 1));
+		nec_priv->iobase = pci_resource_start(cb_priv->pci_device, 1);
 		cb_priv->fifo_iobase = pci_resource_start(cb_priv->pci_device, 2);
 		break;
 	case PCI_CHIP_QUANCOM:
-		nec_priv->iobase = (void *)(pci_resource_start(cb_priv->pci_device, 0));
-		cb_priv->fifo_iobase = (unsigned long)nec_priv->iobase;
+		nec_priv->iobase = pci_resource_start(cb_priv->pci_device, 0);
+		cb_priv->fifo_iobase = nec_priv->iobase;
 		break;
 	default:
 		pr_err("cb7210: bug! unhandled pci_chip=%i\n", cb_priv->pci_chip);
@@ -1040,8 +1040,8 @@ int cb_isa_attach(gpib_board_t *board, const gpib_board_config_t *config)
 		return retval;
 	cb_priv = board->private_data;
 	nec_priv = &cb_priv->nec7210_priv;
-	if (request_region((unsigned long)config->ibbase, cb7210_iosize, "cb7210") == 0) {
-		pr_err("gpib: ioports starting at 0x%p are already in use\n", config->ibbase);
+	if (request_region(config->ibbase, cb7210_iosize, "cb7210") == 0) {
+		pr_err("gpib: ioports starting at 0x%u are already in use\n", config->ibbase);
 		return -EIO;
 	}
 	nec_priv->iobase = config->ibbase;
@@ -1351,12 +1351,6 @@ static struct pcmcia_driver cb_gpib_cs_driver = {
 	.resume		= cb_gpib_resume,
 };
 
-int cb_pcmcia_init_module(void)
-{
-	pcmcia_register_driver(&cb_gpib_cs_driver);
-	return 0;
-}
-
 void cb_pcmcia_cleanup_module(void)
 {
 	DEBUG(0, "cb_gpib_cs: unloading\n");
@@ -1471,7 +1465,7 @@ int cb_pcmcia_attach(gpib_board_t *board, const gpib_board_config_t *config)
 		       (unsigned long)curr_dev->resource[0]->start);
 		return -EIO;
 	}
-	nec_priv->iobase = (void *)(unsigned long)curr_dev->resource[0]->start;
+	nec_priv->iobase = curr_dev->resource[0]->start;
 	cb_priv->fifo_iobase = curr_dev->resource[0]->start;
 
 	if (request_irq(curr_dev->irq, cb7210_interrupt, IRQF_SHARED,
@@ -1506,32 +1500,102 @@ void cb_pcmcia_detach(gpib_board_t *board)
 
 static int __init cb7210_init_module(void)
 {
-	int err = 0;
-	int result;
+	int ret;
 
-	result = pci_register_driver(&cb7210_pci_driver);
-	if (result) {
-		pr_err("cb7210: pci_driver_register failed!\n");
-		return result;
+	ret = pci_register_driver(&cb7210_pci_driver);
+	if (ret) {
+		pr_err("cb7210: pci_register_driver failed: error = %d\n", ret);
+		return ret;
 	}
 
-	gpib_register_driver(&cb_pci_interface, THIS_MODULE);
-	gpib_register_driver(&cb_isa_interface, THIS_MODULE);
-	gpib_register_driver(&cb_pci_accel_interface, THIS_MODULE);
-	gpib_register_driver(&cb_pci_unaccel_interface, THIS_MODULE);
-	gpib_register_driver(&cb_isa_accel_interface, THIS_MODULE);
-	gpib_register_driver(&cb_isa_unaccel_interface, THIS_MODULE);
+	ret = gpib_register_driver(&cb_pci_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_pci;
+	}
 
-#ifdef GPIB__PCMCIA
-	gpib_register_driver(&cb_pcmcia_interface, THIS_MODULE);
-	gpib_register_driver(&cb_pcmcia_accel_interface, THIS_MODULE);
-	gpib_register_driver(&cb_pcmcia_unaccel_interface, THIS_MODULE);
-	err += cb_pcmcia_init_module();
+	ret = gpib_register_driver(&cb_isa_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_isa;
+	}
+
+	ret = gpib_register_driver(&cb_pci_accel_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_pci_accel;
+	}
+
+	ret = gpib_register_driver(&cb_pci_unaccel_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_pci_unaccel;
+	}
+
+	ret = gpib_register_driver(&cb_isa_accel_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_isa_accel;
+	}
+
+	ret = gpib_register_driver(&cb_isa_unaccel_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_isa_unaccel;
+	}
+
+#ifdef GPIB_PCMCIA
+	ret = gpib_register_driver(&cb_pcmcia_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_pcmcia;
+	}
+
+	ret = gpib_register_driver(&cb_pcmcia_accel_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_pcmcia_accel;
+	}
+
+	ret = gpib_register_driver(&cb_pcmcia_unaccel_interface, THIS_MODULE);
+	if (ret) {
+		pr_err("cb7210: gpib_register_driver failed: error = %d\n", ret);
+		goto err_pcmcia_unaccel;
+	}
+
+	ret = pcmcia_register_driver(&cb_gpib_cs_driver);
+	if (ret) {
+		pr_err("cb7210: pcmcia_register_driver failed: error = %d\n", ret);
+		goto err_pcmcia_driver;
+	}
 #endif
-	if (err)
-		return -1;
 
 	return 0;
+
+#ifdef GPIB_PCMCIA
+err_pcmcia_driver:
+	gpib_unregister_driver(&cb_pcmcia_unaccel_interface);
+err_pcmcia_unaccel:
+	gpib_unregister_driver(&cb_pcmcia_accel_interface);
+err_pcmcia_accel:
+	gpib_unregister_driver(&cb_pcmcia_interface);
+err_pcmcia:
+#endif
+	gpib_unregister_driver(&cb_isa_unaccel_interface);
+err_isa_unaccel:
+	gpib_unregister_driver(&cb_isa_accel_interface);
+err_isa_accel:
+	gpib_unregister_driver(&cb_pci_unaccel_interface);
+err_pci_unaccel:
+	gpib_unregister_driver(&cb_pci_accel_interface);
+err_pci_accel:
+	gpib_unregister_driver(&cb_isa_interface);
+err_isa:
+	gpib_unregister_driver(&cb_pci_interface);
+err_pci:
+	pci_unregister_driver(&cb7210_pci_driver);
+
+	return ret;
 }
 
 static void __exit cb7210_exit_module(void)
