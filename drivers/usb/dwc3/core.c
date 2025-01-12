@@ -1304,6 +1304,24 @@ static void dwc3_config_threshold(struct dwc3 *dwc)
 	}
 }
 
+static void dwc3_set_axi_pipe_limit(struct dwc3 *dwc)
+{
+	struct device *dev = dwc->dev;
+	u32 cfg;
+
+	if (!dwc->axi_pipe_limit)
+		return;
+	if (dwc->axi_pipe_limit > 16) {
+		dev_err(dev, "Invalid axi_pipe_limit property\n");
+		return;
+	}
+	cfg = dwc3_readl(dwc->regs, DWC3_GSBUSCFG1);
+	cfg &= ~DWC3_GSBUSCFG1_PIPETRANSLIMIT(15);
+	cfg |= DWC3_GSBUSCFG1_PIPETRANSLIMIT(dwc->axi_pipe_limit - 1);
+
+	dwc3_writel(dwc->regs, DWC3_GSBUSCFG1, cfg);
+}
+
 /**
  * dwc3_core_init - Low-level initialization of DWC3 Core
  * @dwc: Pointer to our controller context structure
@@ -1370,6 +1388,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
 	dwc3_set_incr_burst_type(dwc);
 
 	dwc3_config_soc_bus(dwc);
+
+	dwc3_set_axi_pipe_limit(dwc);
 
 	ret = dwc3_phy_power_on(dwc);
 	if (ret)
@@ -1444,11 +1464,20 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		if (dwc->dis_tx_ipgap_linecheck_quirk)
 			reg |= DWC3_GUCTL1_TX_IPGAP_LINECHECK_DIS;
 
+		if (dwc->enh_nak_fs_quirk)
+			reg |= DWC3_GUCTL1_NAK_PER_ENH_FS;
+
+		if (dwc->enh_nak_hs_quirk)
+			reg |= DWC3_GUCTL1_NAK_PER_ENH_HS;
+
 		if (dwc->parkmode_disable_ss_quirk)
 			reg |= DWC3_GUCTL1_PARKMODE_DISABLE_SS;
 
 		if (dwc->parkmode_disable_hs_quirk)
 			reg |= DWC3_GUCTL1_PARKMODE_DISABLE_HS;
+
+		if (dwc->parkmode_disable_fsls_quirk)
+			reg |= DWC3_GUCTL1_PARKMODE_DISABLE_FSLS;
 
 		if (DWC3_VER_IS_WITHIN(DWC3, 290A, ANY)) {
 			if (dwc->maximum_speed == USB_SPEED_FULL ||
@@ -1476,6 +1505,24 @@ static int dwc3_core_init(struct dwc3 *dwc)
 			reg = dwc3_readl(dwc->regs, DWC3_LLUCTL(i));
 			reg |= DWC3_LLUCTL_FORCE_GEN1;
 			dwc3_writel(dwc->regs, DWC3_LLUCTL(i), reg);
+		}
+	}
+
+	if (DWC3_IP_IS(DWC3) && dwc->dr_mode == USB_DR_MODE_HOST) {
+		u8 tx_thr_num = dwc->tx_thr_num_pkt_prd;
+		u8 tx_maxburst = dwc->tx_max_burst_prd;
+
+		if (tx_thr_num && tx_maxburst) {
+			reg = dwc3_readl(dwc->regs, DWC3_GTXTHRCFG);
+			reg |= DWC3_GTXTHRCFG_PKTCNTSEL;
+
+			reg &= ~DWC3_GTXTHRCFG_TXPKTCNT(~0);
+			reg |= DWC3_GTXTHRCFG_TXPKTCNT(tx_thr_num);
+
+			reg &= ~DWC3_GTXTHRCFG_MAXTXBURSTSIZE(~0);
+			reg |= DWC3_GTXTHRCFG_MAXTXBURSTSIZE(tx_maxburst);
+
+			dwc3_writel(dwc->regs, DWC3_GTXTHRCFG, reg);
 		}
 	}
 
@@ -1664,6 +1711,7 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	u8			tx_thr_num_pkt_prd = 0;
 	u8			tx_max_burst_prd = 0;
 	u8			tx_fifo_resize_max_num;
+	u8			axi_pipe_limit;
 	const char		*usb_psy_name;
 	int			ret;
 
@@ -1685,6 +1733,9 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	 * for endpoints that have a large bMaxBurst value.
 	 */
 	tx_fifo_resize_max_num = 6;
+
+	/* Default to 0 (don't override hardware defaults) */
+	axi_pipe_limit = 0;
 
 	dwc->maximum_speed = usb_get_maximum_speed(dev);
 	dwc->max_ssp_rate = usb_get_maximum_ssp_rate(dev);
@@ -1783,10 +1834,16 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				"snps,resume-hs-terminations");
 	dwc->ulpi_ext_vbus_drv = device_property_read_bool(dev,
 				"snps,ulpi-ext-vbus-drv");
+	dwc->enh_nak_fs_quirk = device_property_read_bool(dev,
+				"snps,enhanced-nak-fs-quirk");
+	dwc->enh_nak_hs_quirk = device_property_read_bool(dev,
+				"snps,enhanced-nak-hs-quirk");
 	dwc->parkmode_disable_ss_quirk = device_property_read_bool(dev,
 				"snps,parkmode-disable-ss-quirk");
 	dwc->parkmode_disable_hs_quirk = device_property_read_bool(dev,
 				"snps,parkmode-disable-hs-quirk");
+	dwc->parkmode_disable_fsls_quirk = device_property_read_bool(dev,
+				"snps,parkmode-disable-fsls-quirk");
 	dwc->gfladj_refclk_lpm_sel = device_property_read_bool(dev,
 				"snps,gfladj-refclk-lpm-sel-quirk");
 
@@ -1807,6 +1864,9 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	dwc->dis_split_quirk = device_property_read_bool(dev,
 				"snps,dis-split-quirk");
 
+	device_property_read_u8(dev, "snps,axi-pipe-limit",
+				   &axi_pipe_limit);
+
 	dwc->lpm_nyet_threshold = lpm_nyet_threshold;
 	dwc->tx_de_emphasis = tx_de_emphasis;
 
@@ -1823,6 +1883,8 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 
 	dwc->tx_thr_num_pkt_prd = tx_thr_num_pkt_prd;
 	dwc->tx_max_burst_prd = tx_max_burst_prd;
+
+	dwc->axi_pipe_limit = axi_pipe_limit;
 
 	dwc->imod_interval = 0;
 
@@ -2164,6 +2226,12 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc3_get_properties(dwc);
 
 	dwc3_get_software_properties(dwc);
+
+	if (!dwc->sysdev_is_parent) {
+		ret = dma_set_mask_and_coherent(dwc->sysdev, DMA_BIT_MASK(64));
+		if (ret)
+			return ret;
+	}
 
 	dwc->reset = devm_reset_control_array_get_optional_shared(dev);
 	if (IS_ERR(dwc->reset)) {

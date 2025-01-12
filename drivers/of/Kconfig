@@ -126,4 +126,8 @@ config OF_OVERLAY_KUNIT_TEST
 config OF_NUMA
 	bool
 
+config OF_DMA_DEFAULT_COHERENT
+	# arches should select this if DMA is coherent by default for OF devices
+	bool
+
 endif # OF
