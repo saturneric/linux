@@ -509,7 +509,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	struct device *hwmon;
 	int ret;
 	const struct hwmon_channel_info **channels;
-	u32 pwm_min_from_stopped = 0;
+	u32 initial_pwm, pwm_min_from_stopped = 0;
 	u32 *fan_channel_config;
 	int channel_count = 1;	/* We always have a PWM channel. */
 	int i;
@@ -557,11 +557,21 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	ctx->enable_mode = pwm_disable_reg_enable;
 
+	ret = pwm_fan_get_cooling_data(dev, ctx);
+	if (ret)
+		return ret;
+
+	/* use maximum cooling level if provided */
+	if (ctx->pwm_fan_cooling_levels)
+		initial_pwm = ctx->pwm_fan_cooling_levels[ctx->pwm_fan_max_state];
+	else
+		initial_pwm = MAX_PWM;
+
 	/*
 	 * Set duty cycle to maximum allowed and enable PWM output as well as
 	 * the regulator. In case of error nothing is changed
 	 */
-	ret = set_pwm(ctx, MAX_PWM);
+	ret = set_pwm(ctx, initial_pwm);
 	if (ret) {
 		dev_err(dev, "Failed to configure PWM: %d\n", ret);
 		return ret;
@@ -677,16 +687,16 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		channels[1] = &ctx->fan_channel;
 	}
 
-	ret = of_property_read_u32(dev->of_node, "fan-stop-to-start-percent",
-				   &pwm_min_from_stopped);
+	ret = device_property_read_u32(dev, "fan-stop-to-start-percent",
+				       &pwm_min_from_stopped);
 	if (!ret && pwm_min_from_stopped) {
 		ctx->pwm_duty_cycle_from_stopped =
 			DIV_ROUND_UP_ULL(pwm_min_from_stopped *
 					 (ctx->pwm_state.period - 1),
 					 100);
 	}
-	ret = of_property_read_u32(dev->of_node, "fan-stop-to-start-us",
-				   &ctx->pwm_usec_from_stopped);
+	ret = device_property_read_u32(dev, "fan-stop-to-start-us",
+				       &ctx->pwm_usec_from_stopped);
 	if (ret)
 		ctx->pwm_usec_from_stopped = 250000;
 
@@ -700,10 +710,6 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		ret = PTR_ERR(hwmon);
 		goto error;
 	}
-
-	ret = pwm_fan_get_cooling_data(dev, ctx);
-	if (ret)
-		goto error;
 
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 	if (IS_ENABLED(CONFIG_THERMAL)) {
