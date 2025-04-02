@@ -136,10 +136,16 @@ rp1_target: &pcie2 {
 // Add some labels to 2712 device
 
 // The system UART
-&uart10 { status = "okay"; };
+&uart10 { 
+	interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+	status = "okay"; 
+};
 
 // The system SPI for the bootloader EEPROM
-&spi10 { status = "okay"; };
+&spi10 { 
+	dmas = <&dma40 3>, <&dma40 4>;
+	status = "okay"; 
+};
 
 #include "rp1.dtsi"
 
@@ -276,12 +282,14 @@ dpi_16bit_gpio2:        &rp1_dpi_16bit_gpio2        { };
 };
 
 &hdmi0 {
+	dmas = <&dma40 (12|(1<<30)|(1<<24)|(10<<16)|(15<<20))>;
 	clocks = <&firmware_clocks 13>, <&firmware_clocks 14>, <&dvp 0>, <&clk_27MHz>;
 	clock-names = "hdmi", "bvb", "audio", "cec";
 	status = "disabled";
 };
 
 &hdmi1 {
+	dmas = <&dma40 (13|(1<<30)|(1<<24)|(10<<16)|(15<<20))>;
 	clocks = <&firmware_clocks 13>, <&firmware_clocks 14>, <&dvp 1>, <&clk_27MHz>;
 	clock-names = "hdmi", "bvb", "audio", "cec";
 	status = "disabled";
@@ -329,6 +337,9 @@ dpi_16bit_gpio2:        &rp1_dpi_16bit_gpio2        { };
 };
 
 &pinctrl_aon {
+	compatible = "brcm,bcm2712d0-aon-pinctrl";
+	reg = <0x7d510700 0x1c>;
+
 	emmc_aon_cd_pins: emmc_aon_cd_pins {
 		function = "sd_card_g";
 		pins = "aon_gpio5";
@@ -343,6 +354,9 @@ dpi_16bit_gpio2:        &rp1_dpi_16bit_gpio2        { };
 };
 
 &pinctrl {
+	compatible = "brcm,bcm2712d0-pinctrl";
+	reg = <0x7d504100 0x20>;
+
 	pwr_button_pins: pwr_button_pins {
 		function = "gpio";
 		pins = "gpio20";
@@ -486,6 +500,8 @@ spi10_cs_pins: &spi10_cs_gpio1 {};
 
 	/delete-property/ interrupt-controller;
 	/delete-property/ #interrupt-cells;
+
+	brcm,gpio-bank-widths = <15 6>;
 };
 
 &main_aon_irq {
