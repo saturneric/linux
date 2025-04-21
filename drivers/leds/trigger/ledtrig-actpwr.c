@@ -122,7 +122,7 @@ static void actpwr_trig_deactivate(struct led_classdev *led_cdev)
 	struct actpwr_trig_data *trig  = &actpwr_data;
 
 	if (list_empty(&trig->trig.led_cdevs)) {
-		del_timer_sync(&trig->timer);
+		timer_delete_sync(&trig->timer);
 		trig->active = NULL;
 	}
 }

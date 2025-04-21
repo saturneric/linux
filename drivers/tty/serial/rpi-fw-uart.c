@@ -494,8 +494,7 @@ static int rpi_fw_uart_probe(struct platform_device *pdev)
 	rfu->data_bits = 8;
 
 	/* RX is polled */
-	hrtimer_init(&rfu->trigger_start_rx, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	rfu->trigger_start_rx.function = rpi_fw_uart_trigger_rx;
+	hrtimer_setup(&rfu->trigger_start_rx, rpi_fw_uart_trigger_rx, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	err = uart_register_driver(&rfu->driver);
 	if (err) {

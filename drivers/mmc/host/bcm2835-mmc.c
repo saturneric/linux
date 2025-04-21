@@ -1248,7 +1248,7 @@ static void bcm2835_mmc_tasklet_finish(unsigned long param)
 		return;
 	}
 
-	del_timer(&host->timer);
+	timer_delete(&host->timer);
 
 	mrq = host->mrq;
 
@@ -1522,7 +1522,7 @@ static void bcm2835_mmc_remove(struct platform_device *pdev)
 
 	free_irq(host->irq, host);
 
-	del_timer_sync(&host->timer);
+	timer_delete_sync(&host->timer);
 
 	tasklet_kill(&host->finish_tasklet);
 

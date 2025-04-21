@@ -772,7 +772,7 @@ void DWC_TIMER_FREE(dwc_timer_t *timer)
 	DWC_SPINLOCK_IRQSAVE(timer->lock, &flags);
 
 	if (timer->scheduled) {
-		del_timer(&timer->t);
+		timer_delete(&timer->t);
 		timer->scheduled = 0;
 	}
 
@@ -803,7 +803,7 @@ void DWC_TIMER_SCHEDULE(dwc_timer_t *timer, uint32_t time)
 
 void DWC_TIMER_CANCEL(dwc_timer_t *timer)
 {
-	del_timer(&timer->t);
+	timer_delete(&timer->t);
 }
 
 

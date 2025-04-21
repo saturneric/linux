@@ -1648,7 +1648,7 @@ static void serial8250_start_tx(struct uart_port *port)
 	lockdep_assert_held_once(&port->lock);
 
 	if (up->bugs & UART_BUG_NOMSI)
-		del_timer(&up->timer);
+		timer_delete(&up->timer);
 
 	if (!port->x_char && kfifo_is_empty(&port->state->port.xmit_fifo))
 		return;

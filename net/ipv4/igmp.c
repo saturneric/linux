@@ -44,7 +44,7 @@
  *		Alan Cox	:	Use GFP_ATOMIC in the right places.
  *		Christian Daudt :	igmp timer wasn't set for local group
  *					memberships but was being deleted,
- *					which caused a "del_timer() called
+ *					which caused a "timer_delete() called
  *					from %p with timer not initialized\n"
  *					message (960131).
  *		Christian Daudt :	removed del_timer from

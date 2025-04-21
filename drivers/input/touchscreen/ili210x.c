@@ -1059,7 +1059,7 @@ static void ili210x_i2c_remove(struct i2c_client *client)
 	struct ili210x *tsdata = i2c_get_clientdata(client);
 
 	if (!client->irq) {
-		del_timer(&tsdata->poll_timer);
+		timer_delete(&tsdata->poll_timer);
 		cancel_work_sync(&tsdata->poll_work);
 	}
 }

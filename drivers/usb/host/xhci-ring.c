@@ -739,7 +739,7 @@ static int xhci_move_dequeue_past_td(struct xhci_hcd *xhci,
 	 */
 	if (xhci->quirks & XHCI_EP_CTX_BROKEN_DCS &&
 	    !(ep->ep_state & EP_HAS_STREAMS))
-		halted_seg = trb_in_td(xhci, td, hw_dequeue & ~0xf, false);
+		halted_seg = trb_in_td(td, hw_dequeue & ~0xf);
 	if (halted_seg) {
 		index = ((dma_addr_t)(hw_dequeue & ~0xf) - halted_seg->dma) /
 			 sizeof(*halted_trb);

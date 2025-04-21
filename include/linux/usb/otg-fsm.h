@@ -289,7 +289,7 @@ static inline int otg_del_timer(struct otg_fsm *fsm, enum otg_fsm_timer timer)
 {
 	if (!fsm->ops->del_timer)
 		return -EOPNOTSUPP;
-	fsm->ops->del_timer(fsm, timer);
+	fsm->ops->timer_delete(fsm, timer);
 	return 0;
 }
 
