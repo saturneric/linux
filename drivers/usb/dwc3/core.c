@@ -1747,8 +1747,6 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	u8			tx_max_burst_prd = 0;
 	u8			tx_fifo_resize_max_num;
 	u8			axi_pipe_limit;
-	const char		*usb_psy_name;
-	int			ret;
 
 	/* default to highest possible threshold */
 	lpm_nyet_threshold = 0xf;

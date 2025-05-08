@@ -240,16 +240,6 @@ static int xhci_pci_reinit(struct xhci_hcd *xhci, struct pci_dev *pdev)
 	return 0;
 }
 
-static u32 xhci_vl805_get_fw_version(struct pci_dev *dev)
-{
-	int ret;
-	u32 ver;
-
-	ret = pci_read_config_dword(dev, 0x50, &ver);
-	/* Default to a fw version of 0 instead of ~0 */
-	return ret ? 0 : ver;
-}
-
 static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
 	struct pci_dev                  *pdev = to_pci_dev(dev);
