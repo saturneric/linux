@@ -1429,7 +1429,9 @@ static int bch2_next_fiemap_extent(struct btree_trans *trans,
 	if (ret)
 		goto err;
 
-	ret = bch2_next_fiemap_pagecache_extent(trans, inode, start, end, cur);
+	u64 pagecache_end = k.k ? max(start, bkey_start_offset(k.k)) : end;
+
+	ret = bch2_next_fiemap_pagecache_extent(trans, inode, start, pagecache_end, cur);
 	if (ret)
 		goto err;
 
@@ -1662,33 +1664,9 @@ static int fssetxattr_inode_update_fn(struct btree_trans *trans,
 		return -EINVAL;
 
 	if (s->casefold != bch2_inode_casefold(c, bi)) {
-#ifdef CONFIG_UNICODE
-		int ret = 0;
-		/* Not supported on individual files. */
-		if (!S_ISDIR(bi->bi_mode))
-			return -EOPNOTSUPP;
-
-		/*
-		 * Make sure the dir is empty, as otherwise we'd need to
-		 * rehash everything and update the dirent keys.
-		 */
-		ret = bch2_empty_dir_trans(trans, inode_inum(inode));
-		if (ret < 0)
-			return ret;
-
-		ret = bch2_request_incompat_feature(c, bcachefs_metadata_version_casefolding);
+		int ret = bch2_inode_set_casefold(trans, inode_inum(inode), bi, s->casefold);
 		if (ret)
 			return ret;
-
-		bch2_check_set_feature(c, BCH_FEATURE_casefolding);
-
-		bi->bi_casefold = s->casefold + 1;
-		bi->bi_fields_set |= BIT(Inode_opt_casefold);
-
-#else
-		printk(KERN_ERR "Cannot use casefolding on a kernel without CONFIG_UNICODE\n");
-		return -EOPNOTSUPP;
-#endif
 	}
 
 	if (s->set_project) {
