@@ -211,8 +211,8 @@ static int __init armctrl_of_init(struct device_node *node,
 		panic("%pOF: unable to map IC registers\n", node);
 
 	intc.base = base;
-	intc.domain = irq_domain_add_linear(node, NUMBER_IRQS * 2,
-					    &armctrl_ops, NULL);
+	intc.domain = irq_domain_create_linear(of_fwnode_handle(node), MAKE_HWIRQ(NR_BANKS, 0),
+			&armctrl_ops, NULL);
 	if (!intc.domain)
 		panic("%pOF: unable to create IRQ domain\n", node);
 

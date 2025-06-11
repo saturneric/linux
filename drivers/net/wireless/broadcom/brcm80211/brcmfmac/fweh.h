@@ -100,6 +100,10 @@ struct brcmf_cfg80211_info;
 	BRCMF_ENUM_DEF(EXT_AUTH_FRAME_RX, 188) \
 	BRCMF_ENUM_DEF(MGMT_FRAME_TXSTATUS, 189) \
 	BRCMF_ENUM_DEF(MGMT_FRAME_OFF_CHAN_COMPLETE, 190)
+	BRCMF_ABSTRACT_ENUM_DEF(EXT_AUTH_REQ, 0) \
+	BRCMF_ABSTRACT_ENUM_DEF(EXT_AUTH_FRAME_RX, 1) \
+	BRCMF_ABSTRACT_ENUM_DEF(MGMT_FRAME_TXSTATUS, 2) \
+	BRCMF_ABSTRACT_ENUM_DEF(MGMT_FRAME_OFFCHAN_DONE, 3)
 
 #define BRCMF_ENUM_DEF(id, val) \
 	BRCMF_E_##id = (val),
@@ -364,7 +368,7 @@ struct brcmf_fweh_info {
 	struct list_head event_q;
 	uint event_mask_len;
 	u8 *event_mask;
-	struct brcmf_fweh_event_map *event_map;
+	const struct brcmf_fweh_event_map *event_map;
 	uint num_event_codes;
 	brcmf_fweh_handler_t evt_handler[] __counted_by(num_event_codes);
 };

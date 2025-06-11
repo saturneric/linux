@@ -1363,11 +1363,12 @@ int brcmf_attach(struct device *dev, bool start_bus)
 	brcmf_fweh_register(drvr, BRCMF_E_PSM_WATCHDOG,
 			    brcmf_psm_watchdog_notify);
 
+	brcmf_fwvid_get_cfg80211_ops(drvr);
+
 	if (start_bus) {
 		ret = brcmf_bus_started(drvr, drvr->ops);
 		if (ret != 0) {
-			bphy_err(drvr, "dongle is not responding: err=%d\n",
-				 ret);
+			bphy_err(drvr, "dongle is not responding: err=%d\n", ret);
 			goto fail;
 		}
 	}

@@ -75,6 +75,7 @@ const char *brcmf_fweh_event_name(enum brcmf_fweh_event_code code)
 	return "nodebug";
 }
 #endif
+BRCMF_EXPORT_SYMBOL_GPL(brcmf_fweh_event_name);
 
 /**
  * brcmf_fweh_queue_event() - create and queue event.
@@ -405,6 +406,7 @@ int brcmf_fweh_register(struct brcmf_pub *drvr, enum brcmf_fweh_event_code code,
 		  brcmf_fweh_event_name(code));
 	return 0;
 }
+BRCMF_EXPORT_SYMBOL_GPL(brcmf_fweh_register);
 
 /**
  * brcmf_fweh_unregister() - remove handler for given code.
@@ -428,52 +430,36 @@ void brcmf_fweh_unregister(struct brcmf_pub *drvr,
  *
  * @ifp: primary interface object.
  */
-int brcmf_fweh_activate_events(struct brcmf_if *ifp)
-{
-	struct brcmf_fweh_info *fweh = ifp->drvr->fweh;
-	enum brcmf_fweh_event_code code;
-	struct eventmsgs_ext *eventmask_msg;
-	u32 msglen;
-	int i, err;
-
-	memset(fweh->event_mask, 0, fweh->event_mask_len);
-	for (i = 0; i < fweh->num_event_codes; i++) {
-		if (fweh->evt_handler[i]) {
-			brcmf_fweh_map_fwevt_code(fweh, i, &code);
-			brcmf_dbg(EVENT, "enable event %s\n",
-				  brcmf_fweh_event_name(code));
-			setbit(fweh->event_mask, i);
-		}
-	}
-
-	msglen = EVENTMSGS_EXT_STRUCT_SIZE + fweh->event_mask_len;
-	eventmask_msg = kzalloc(msglen, GFP_KERNEL);
-	if (!eventmask_msg)
-		return -ENOMEM;
-
-	/* want to handle IF event as well */
-	brcmf_dbg(EVENT, "enable event IF\n");
-	setbit(fweh->event_mask, BRCMF_E_IF);
-
-	eventmask_msg->ver = EVENTMSGS_VER;
-	eventmask_msg->command = EVENTMSGS_SET_MASK;
-	eventmask_msg->len = fweh->event_mask_len;
-	memcpy(eventmask_msg->mask, fweh->event_mask, fweh->event_mask_len);
-
-	err = brcmf_fil_iovar_data_set(ifp, "event_msgs_ext", eventmask_msg,
-				       msglen);
-	if (!err)
-		goto end;
-
-	err = brcmf_fil_iovar_data_set(ifp, "event_msgs", fweh->event_mask,
-				       fweh->event_mask_len);
-	if (err)
-		bphy_err(fweh->drvr, "Set event_msgs error (%d)\n", err);
-
-end:
-	kfree(eventmask_msg);
-	return err;
-}
+ int brcmf_fweh_activate_events(struct brcmf_if *ifp)
+ {
+	 struct brcmf_fweh_info *fweh = ifp->drvr->fweh;
+	 enum brcmf_fweh_event_code code;
+	 int i, err;
+ 
+	 memset(fweh->event_mask, 0, fweh->event_mask_len);
+	 for (i = 0; i < fweh->num_event_codes; i++) {
+		 if (fweh->evt_handler[i]) {
+			 brcmf_fweh_map_fwevt_code(fweh, i, &code);
+			 brcmf_dbg(EVENT, "enable event %s\n",
+					 brcmf_fweh_event_name(code));
+			 setbit(fweh->event_mask, i);
+		 }
+	 }
+ 
+	 /* want to handle IF event as well */
+	 brcmf_dbg(EVENT, "enable event IF\n");
+	 setbit(fweh->event_mask, BRCMF_E_IF);
+ 
+	 /* allow per-vendor method to activate firmware events */
+	 if (!brcmf_fwvid_activate_events(ifp))
+		 return 0;
+ 
+	 err = brcmf_fil_iovar_data_set(ifp, "event_msgs", fweh->event_mask,
+								fweh->event_mask_len);
+	 if (err)
+		 bphy_err(fweh->drvr, "Set event_msgs error (%d)\n", err);
+	 return err;
+ }
 
 /**
  * brcmf_fweh_process_event() - process skb as firmware event.

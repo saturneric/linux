@@ -21,64 +21,76 @@ static const struct mmc_fixup __maybe_unused mmc_sd_fixups[] = {
 	 * This has been observed on cards from 2019/11 and 2021/11, while new
 	 * cards from 2023/05 and 2024/08 do not exhibit this behavior.
 	 */
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2019, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2019,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2020, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2020,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2021, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2021,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2022, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_KINGSTON_SD, 0x5449, 2022,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
 	/*
 	 * GIGASTONE Gaming Plus microSD cards manufactured on 02/2022 never
 	 * clear Flush Cache bit and set Poweroff Notification Ready bit.
 	 */
-	_FIXUP_EXT("ASTC", CID_MANFID_GIGASTONE, 0x3456, 2022, 2,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE | MMC_QUIRK_BROKEN_SD_POWEROFF_NOTIFY,
+	_FIXUP_EXT("ASTC", CID_MANFID_GIGASTONE, 0x3456, 2022, 2, 0, -1ull,
+		   SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
+		   MMC_QUIRK_BROKEN_SD_CACHE |
+			   MMC_QUIRK_BROKEN_SD_POWEROFF_NOTIFY,
 		   EXT_CSD_REV_ANY),
+
+	/*
+	 * Swissbit series S46-u cards throw I/O errors during tuning requests
+	 * after the initial tuning request expectedly times out. This has
+	 * only been observed on cards manufactured on 01/2019 that are using
+	 * Bay Trail host controllers.
+	 */
+	_FIXUP_EXT("0016G", CID_MANFID_SWISSBIT, 0x5342, 2019, 1, 0, -1ull,
+		   SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
+		   MMC_QUIRK_NO_UHS_DDR50_TUNING, EXT_CSD_REV_ANY),
 
 	/*
 	 * Samsung Pro Plus/EVO Plus/Pro Ultimate SD cards (2023) claim to cache
 	 * flush OK, but become unresponsive afterwards.
 	 */
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SAMSUNG_SD, 0x534d, 2023, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SAMSUNG_SD, 0x534d, 2023,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
 	/*
 	 * Early Sandisk Extreme and Extreme Pro A2 cards never finish SD cache
 	 * flush in CQ mode. Latest card date this was seen on is 10/2020.
 	 */
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2019, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2019,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2020, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2020,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
 	/* SD A2 allow-list - only trust CQ on these cards */
 	/* Raspberry Pi A2 cards */
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_LONGSYS_SD, 0x4c53, CID_YEAR_ANY, CID_MONTH_ANY,
-		   cid_rev(1, 0, 0, 0), -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_WORKING_SD_CQ, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_LONGSYS_SD, 0x4c53, CID_YEAR_ANY,
+		   CID_MONTH_ANY, cid_rev(1, 0, 0, 0), -1ull, SDIO_ANY_ID,
+		   SDIO_ANY_ID, add_quirk_sd, MMC_QUIRK_WORKING_SD_CQ,
+		   EXT_CSD_REV_ANY),
 
 	END_FIXUP
 };
 
 static const struct mmc_fixup __maybe_unused mmc_blk_fixups[] = {
-#define INAND_CMD38_ARG_EXT_CSD  113
-#define INAND_CMD38_ARG_ERASE    0x00
-#define INAND_CMD38_ARG_TRIM     0x01
+#define INAND_CMD38_ARG_EXT_CSD 113
+#define INAND_CMD38_ARG_ERASE 0x00
+#define INAND_CMD38_ARG_TRIM 0x01
 #define INAND_CMD38_ARG_SECERASE 0x80
 #define INAND_CMD38_ARG_SECTRIM1 0x81
 #define INAND_CMD38_ARG_SECTRIM2 0x88
@@ -206,18 +218,17 @@ static const struct mmc_fixup __maybe_unused mmc_ext_csd_fixups[] = {
 	 * Certain Hynix eMMC 4.41 cards might get broken when HPI feature
 	 * is used so disable the HPI feature for such buggy cards.
 	 */
-	MMC_FIXUP_EXT_CSD_REV(CID_NAME_ANY, CID_MANFID_HYNIX,
-			      0x014a, add_quirk, MMC_QUIRK_BROKEN_HPI, 5),
+	MMC_FIXUP_EXT_CSD_REV(CID_NAME_ANY, CID_MANFID_HYNIX, 0x014a, add_quirk,
+			      MMC_QUIRK_BROKEN_HPI, 5),
 	/*
 	 * Certain Micron (Numonyx) eMMC 4.5 cards might get broken when HPI
 	 * feature is used so disable the HPI feature for such buggy cards.
 	 */
-	MMC_FIXUP_EXT_CSD_REV(CID_NAME_ANY, CID_MANFID_NUMONYX,
-			      0x014e, add_quirk, MMC_QUIRK_BROKEN_HPI, 6),
+	MMC_FIXUP_EXT_CSD_REV(CID_NAME_ANY, CID_MANFID_NUMONYX, 0x014e,
+			      add_quirk, MMC_QUIRK_BROKEN_HPI, 6),
 
 	END_FIXUP
 };
-
 
 static const struct mmc_fixup __maybe_unused sdio_fixup_methods[] = {
 	SDIO_FIXUP(SDIO_VENDOR_ID_TI_WL1251, SDIO_DEVICE_ID_TI_WL1251,
@@ -226,14 +237,14 @@ static const struct mmc_fixup __maybe_unused sdio_fixup_methods[] = {
 	SDIO_FIXUP(SDIO_VENDOR_ID_TI_WL1251, SDIO_DEVICE_ID_TI_WL1251,
 		   add_quirk, MMC_QUIRK_DISABLE_CD),
 
-	SDIO_FIXUP(SDIO_VENDOR_ID_TI, SDIO_DEVICE_ID_TI_WL1271,
-		   add_quirk, MMC_QUIRK_NONSTD_FUNC_IF),
+	SDIO_FIXUP(SDIO_VENDOR_ID_TI, SDIO_DEVICE_ID_TI_WL1271, add_quirk,
+		   MMC_QUIRK_NONSTD_FUNC_IF),
 
-	SDIO_FIXUP(SDIO_VENDOR_ID_TI, SDIO_DEVICE_ID_TI_WL1271,
-		   add_quirk, MMC_QUIRK_DISABLE_CD),
+	SDIO_FIXUP(SDIO_VENDOR_ID_TI, SDIO_DEVICE_ID_TI_WL1271, add_quirk,
+		   MMC_QUIRK_DISABLE_CD),
 
-	SDIO_FIXUP(SDIO_VENDOR_ID_STE, SDIO_DEVICE_ID_STE_CW1200,
-		   add_quirk, MMC_QUIRK_BROKEN_BYTE_MODE_512),
+	SDIO_FIXUP(SDIO_VENDOR_ID_STE, SDIO_DEVICE_ID_STE_CW1200, add_quirk,
+		   MMC_QUIRK_BROKEN_BYTE_MODE_512),
 
 	SDIO_FIXUP(SDIO_VENDOR_ID_MARVELL, SDIO_DEVICE_ID_MARVELL_8797_F0,
 		   add_quirk, MMC_QUIRK_BROKEN_IRQ_POLLING),
@@ -249,8 +260,8 @@ static const struct mmc_fixup __maybe_unused sdio_card_init_methods[] = {
 
 	SDIO_FIXUP_COMPATIBLE("silabs,wf200", add_quirk,
 			      MMC_QUIRK_BROKEN_BYTE_MODE_512 |
-			      MMC_QUIRK_LENIENT_FN0 |
-			      MMC_QUIRK_BLKSZ_FOR_BYTE_MODE),
+				      MMC_QUIRK_LENIENT_FN0 |
+				      MMC_QUIRK_BLKSZ_FOR_BYTE_MODE),
 
 	END_FIXUP
 };
@@ -280,8 +291,7 @@ static inline void mmc_fixup_device(struct mmc_card *card,
 		if (f->manfid != CID_MANFID_ANY &&
 		    f->manfid != card->cid.manfid)
 			continue;
-		if (f->oemid != CID_OEMID_ANY &&
-		    f->oemid != card->cid.oemid)
+		if (f->oemid != CID_OEMID_ANY && f->oemid != card->cid.oemid)
 			continue;
 		if (f->name != CID_NAME_ANY &&
 		    strncmp(f->name, card->cid.prod_name,

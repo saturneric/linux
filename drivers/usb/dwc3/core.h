@@ -1090,6 +1090,7 @@ struct dwc3_scratchpad_array {
  * @tx_fifo_resize_max_num: max number of fifos allocated during txfifo resize
  * @clear_stall_protocol: endpoint number that requires a delayed status phase
  * @axi_max_pipe: set to override the maximum number of pipelined AXI transfers
+ * @num_hc_interrupters: number of host controller interrupters
  * @hsphy_interface: "utmi" or "ulpi"
  * @connected: true when we're connected to a host, false otherwise
  * @softconnect: true when gadget connect is called, false when disconnect runs
@@ -1345,6 +1346,7 @@ struct dwc3 {
 	u8			tx_fifo_resize_max_num;
 	u8			clear_stall_protocol;
 	u8			axi_pipe_limit;
+	u16			num_hc_interrupters;
 
 	const char		*hsphy_interface;
 
