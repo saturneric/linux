@@ -827,8 +827,8 @@ static void rp1_gpio_irq_handler(struct irq_desc *desc)
 
 		writel(RP1_GPIO_CTRL_IRQRESET,
 		       pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
-		generic_handle_irq(irq_linear_revmap(pc->gpio_chip.irq.domain,
-						     bank->min_gpio + b));
+		generic_handle_irq(irq_find_mapping(pc->gpio_chip.irq.domain,
+			bank->min_gpio + b));
 	}
 
 	chained_irq_exit(host_chip, desc);

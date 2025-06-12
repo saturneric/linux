@@ -714,7 +714,7 @@ struct dwc_timer {
 
 static void timer_callback(struct timer_list *tt)
 {
-	dwc_timer_t *timer = from_timer(timer, tt, t);
+	dwc_timer_t *timer = timer_container_of(timer, tt, t);
 	dwc_irqflags_t flags;
 
 	DWC_SPINLOCK_IRQSAVE(timer->lock, &flags);

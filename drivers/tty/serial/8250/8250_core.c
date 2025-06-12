@@ -214,7 +214,7 @@ static void serial8250_timeout(struct timer_list *t)
 
 static void serial8250_cts_poll_timeout(struct timer_list *t)
 {
-	struct uart_8250_port *up = from_timer(up, t, timer);
+	struct uart_8250_port *up = timer_container_of(up, t, timer);
 	unsigned long flags;
 
 	spin_lock_irqsave(&up->port.lock, flags);

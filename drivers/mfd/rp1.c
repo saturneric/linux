@@ -168,7 +168,7 @@ static void rp1_chained_handle_irq(struct irq_desc *desc)
 
 	chained_irq_enter(chip, desc);
 
-	new_irq = irq_linear_revmap(rp1->domain, hwirq);
+	new_irq = irq_find_mapping(rp1->domain, hwirq);
 	generic_handle_irq(new_irq);
 	if (rp1_level_triggered_irq[hwirq])
 		msix_cfg_set(rp1, hwirq, MSIX_CFG_IACK);

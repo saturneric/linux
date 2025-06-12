@@ -435,18 +435,20 @@ static const struct iommu_domain_ops bcm2712_iommu_domain_ops = {
 	.free		 = bcm2712_iommu_domain_free,
 };
 
-static struct iommu_domain *bcm2712_iommu_domain_alloc(unsigned int type)
+static struct iommu_domain *bcm2712_iommu_domain_alloc(struct device *dev,
+						       u32 flags,
+						       const struct iommu_user_data *user_data)
 {
 	struct bcm2712_iommu_domain *domain;
 
-	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
-		return NULL;
+	/*if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+	return NULL;*/
 
 	domain = kzalloc(sizeof(*domain), GFP_KERNEL);
 	if (!domain)
 		return NULL;
 
-	domain->base.type = type;
+	domain->base.type = IOMMU_DOMAIN_UNMANAGED;
 	domain->base.ops  = &bcm2712_iommu_domain_ops;
 	domain->base.geometry.aperture_start = APERTURE_BASE;
 	domain->base.geometry.aperture_end   = APERTURE_TOP - 1ul;
@@ -528,7 +530,7 @@ static bool bcm2712_iommu_capable(struct device *dev, enum iommu_cap cap)
 
 static const struct iommu_ops bcm2712_iommu_ops = {
 	.capable        = bcm2712_iommu_capable,
-	.domain_alloc	= bcm2712_iommu_domain_alloc,
+	.domain_alloc_paging_flags	= bcm2712_iommu_domain_alloc,
 	.probe_device	= bcm2712_iommu_probe_device,
 	.release_device	= bcm2712_iommu_release_device,
 	.device_group	= bcm2712_iommu_device_group,
