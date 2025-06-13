@@ -29,7 +29,6 @@
 #define BRCMF_MSGBUF_VAL	0x00040000
 #define BRCMF_PCIE_VAL		0x00080000
 #define BRCMF_FWCON_VAL		0x00100000
-#define BRCMF_ULP_VAL		0x00200000
 
 /* set default print format */
 #undef pr_fmt
@@ -68,12 +67,7 @@ void __brcmf_err(struct brcmf_bus *bus, const char *func, const char *fmt, ...);
 #if defined(DEBUG) || defined(CONFIG_BRCM_TRACING)
 
 /* For debug/tracing purposes treat info messages as errors */
-// #define brcmf_info brcmf_err
-
-#define brcmf_info(fmt, ...)						\
-	do {								\
-		pr_info("%s: " fmt, __func__, ##__VA_ARGS__);		\
-	} while (0)
+#define brcmf_info brcmf_err
 
 __printf(3, 4)
 void __brcmf_dbg(u32 level, const char *func, const char *fmt, ...);
