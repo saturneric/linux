@@ -44,11 +44,11 @@
 #define GOODIX_HAVE_KEY			BIT(4)
 #define GOODIX_BUFFER_STATUS_TIMEOUT	20
 
-#define RESOLUTION_LOC		1
-#define MAX_CONTACTS_LOC	5
-#define TRIGGER_LOC		6
+#define RESOLUTION_LOC			1
+#define MAX_CONTACTS_LOC		5
+#define TRIGGER_LOC			6
 
-#define POLL_INTERVAL_MS		17	/* 17ms = 60fps */
+#define GOODIX_POLL_INTERVAL_MS		17	/* 17ms = 60fps */
 
 /* Our special handling for GPIO accesses through ACPI is x86 specific */
 #if defined CONFIG_X86 && defined CONFIG_ACPI
@@ -499,6 +499,14 @@ sync:
 	input_sync(ts->input_dev);
 }
 
+static void goodix_ts_work_i2c_poll(struct input_dev *input)
+{
+	struct goodix_ts_data *ts = input_get_drvdata(input);
+
+	goodix_process_events(ts);
+	goodix_i2c_write_u8(ts->client, GOODIX_READ_COOR_ADDR, 0);
+}
+
 /**
  * goodix_ts_irq_handler - The IRQ handler
  *
@@ -515,67 +523,32 @@ static irqreturn_t goodix_ts_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static void goodix_ts_irq_poll_timer(struct timer_list *t)
-{
-	struct goodix_ts_data *ts = from_timer(ts, t, timer);
-
-	schedule_work(&ts->work_i2c_poll);
-	mod_timer(&ts->timer, jiffies + msecs_to_jiffies(POLL_INTERVAL_MS));
-}
-
-static void goodix_ts_work_i2c_poll(struct work_struct *work)
-{
-	struct goodix_ts_data *ts = container_of(work,
-			struct goodix_ts_data, work_i2c_poll);
-
-	goodix_process_events(ts);
-	goodix_i2c_write_u8(ts->client, GOODIX_READ_COOR_ADDR, 0);
-}
-
 static void goodix_enable_irq(struct goodix_ts_data *ts)
 {
-	if (ts->client->irq) {
+	if (ts->client->irq)
 		enable_irq(ts->client->irq);
-	} else {
-		ts->timer.expires = jiffies + msecs_to_jiffies(POLL_INTERVAL_MS);
-		add_timer(&ts->timer);
-	}
 }
 
 static void goodix_disable_irq(struct goodix_ts_data *ts)
 {
-	if (ts->client->irq) {
+	if (ts->client->irq)
 		disable_irq(ts->client->irq);
-	} else {
-		timer_delete(&ts->timer);
-		cancel_work_sync(&ts->work_i2c_poll);
-	}
 }
 
 static void goodix_free_irq(struct goodix_ts_data *ts)
 {
-	if (ts->client->irq) {
+	if (ts->client->irq)
 		devm_free_irq(&ts->client->dev, ts->client->irq, ts);
-	} else {
-		timer_delete(&ts->timer);
-		cancel_work_sync(&ts->work_i2c_poll);
-	}
 }
 
 static int goodix_request_irq(struct goodix_ts_data *ts)
 {
-	if (ts->client->irq) {
-		return devm_request_threaded_irq(&ts->client->dev, ts->client->irq,
-						 NULL, goodix_ts_irq_handler,
-						 ts->irq_flags, ts->client->name, ts);
-	} else {
-		INIT_WORK(&ts->work_i2c_poll,
-			  goodix_ts_work_i2c_poll);
-		timer_setup(&ts->timer, goodix_ts_irq_poll_timer, 0);
-		if (ts->irq_pin_access_method == IRQ_PIN_ACCESS_NONE)
-			goodix_enable_irq(ts);
+	if (!ts->client->irq)
 		return 0;
-	}
+
+	return devm_request_threaded_irq(&ts->client->dev, ts->client->irq,
+					 NULL, goodix_ts_irq_handler,
+					 ts->irq_flags, ts->client->name, ts);
 }
 
 static int goodix_check_cfg_8(struct goodix_ts_data *ts, const u8 *cfg, int len)
@@ -1273,6 +1246,18 @@ retry_read_config:
 		dev_err(&ts->client->dev,
 			"Failed to initialize MT slots: %d", error);
 		return error;
+	}
+
+	input_set_drvdata(ts->input_dev, ts);
+
+	if (!ts->client->irq) {
+		error = input_setup_polling(ts->input_dev, goodix_ts_work_i2c_poll);
+		if (error) {
+			dev_err(&ts->client->dev,
+				 "could not set up polling mode, %d\n", error);
+			return error;
+		}
+		input_set_poll_interval(ts->input_dev, GOODIX_POLL_INTERVAL_MS);
 	}
 
 	error = input_register_device(ts->input_dev);

@@ -1457,6 +1457,10 @@ typedef void (*usb_complete_t)(struct urb *);
  * @sg: scatter gather buffer list, the buffer size of each element in
  * 	the list (except the last) must be divisible by the endpoint's
  * 	max packet size if no_sg_constraint isn't set in 'struct usb_bus'
+ * @sgt: used to hold a scatter gather table returned by usb_alloc_noncoherent(),
+ *      which describes the allocated non-coherent and possibly non-contiguous
+ *      memory and is guaranteed to have 1 single DMA mapped segment. The
+ *      allocated memory needs to be freed by usb_free_noncoherent().
  * @num_mapped_sgs: (internal) number of mapped sg entries
  * @num_sgs: number of entries in the sg list
  * @transfer_buffer_length: How big is transfer_buffer.  The transfer may
@@ -1614,24 +1618,25 @@ struct urb {
 					 * current owner */
 	struct list_head anchor_list; /* the URB may be anchored */
 	struct usb_anchor *anchor;
-	struct usb_device *dev; /* (in) pointer to associated device */
-	struct usb_host_endpoint *ep; /* (internal) pointer to endpoint */
-	unsigned int pipe; /* (in) pipe information */
-	unsigned int stream_id; /* (in) stream ID */
-	int status; /* (return) non-ISO status */
-	unsigned int transfer_flags; /* (in) URB_SHORT_NOT_OK | ...*/
-	void *transfer_buffer; /* (in) associated data buffer */
-	dma_addr_t transfer_dma; /* (in) dma addr for transfer_buffer */
-	struct scatterlist *sg; /* (in) scatter gather buffer list */
-	int num_mapped_sgs; /* (internal) mapped sg entries */
-	int num_sgs; /* (in) number of entries in the sg list */
-	u32 transfer_buffer_length; /* (in) data buffer length */
-	u32 actual_length; /* (return) actual transfer length */
-	unsigned char *setup_packet; /* (in) setup packet (control only) */
-	dma_addr_t setup_dma; /* (in) dma addr for setup_packet */
-	int start_frame; /* (modify) start frame (ISO) */
-	int number_of_packets; /* (in) number of ISO packets */
-	int interval; /* (modify) transfer interval
+	struct usb_device *dev;		/* (in) pointer to associated device */
+	struct usb_host_endpoint *ep;	/* (internal) pointer to endpoint */
+	unsigned int pipe;		/* (in) pipe information */
+	unsigned int stream_id;		/* (in) stream ID */
+	int status;			/* (return) non-ISO status */
+	unsigned int transfer_flags;	/* (in) URB_SHORT_NOT_OK | ...*/
+	void *transfer_buffer;		/* (in) associated data buffer */
+	dma_addr_t transfer_dma;	/* (in) dma addr for transfer_buffer */
+	struct scatterlist *sg;		/* (in) scatter gather buffer list */
+	struct sg_table *sgt;		/* (in) scatter gather table for noncoherent buffer */
+	int num_mapped_sgs;		/* (internal) mapped sg entries */
+	int num_sgs;			/* (in) number of entries in the sg list */
+	u32 transfer_buffer_length;	/* (in) data buffer length */
+	u32 actual_length;		/* (return) actual transfer length */
+	unsigned char *setup_packet;	/* (in) setup packet (control only) */
+	dma_addr_t setup_dma;		/* (in) dma addr for setup_packet */
+	int start_frame;		/* (modify) start frame (ISO) */
+	int number_of_packets;		/* (in) number of ISO packets */
+	int interval;			/* (modify) transfer interval
 					 * (INT/ISO) */
 	int error_count; /* (return) number of ISO errors */
 	void *context; /* (in) context for completion */
@@ -1775,7 +1780,6 @@ extern void usb_block_urb(struct urb *urb);
 extern void usb_kill_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_poison_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_unpoison_anchored_urbs(struct usb_anchor *anchor);
-extern void usb_unlink_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_anchor_suspend_wakeups(struct usb_anchor *anchor);
 extern void usb_anchor_resume_wakeups(struct usb_anchor *anchor);
 extern void usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor);
@@ -1815,10 +1819,20 @@ static inline int usb_urb_dir_out(struct urb *urb)
 int usb_pipe_type_check(struct usb_device *dev, unsigned int pipe);
 int usb_urb_ep_type_check(const struct urb *urb);
 
-void *usb_alloc_coherent(struct usb_device *dev, size_t size, gfp_t mem_flags,
-			 dma_addr_t *dma);
-void usb_free_coherent(struct usb_device *dev, size_t size, void *addr,
-		       dma_addr_t dma);
+void *usb_alloc_coherent(struct usb_device *dev, size_t size,
+	gfp_t mem_flags, dma_addr_t *dma);
+void usb_free_coherent(struct usb_device *dev, size_t size,
+	void *addr, dma_addr_t dma);
+
+enum dma_data_direction;
+
+void *usb_alloc_noncoherent(struct usb_device *dev, size_t size,
+			    gfp_t mem_flags, dma_addr_t *dma,
+			    enum dma_data_direction dir,
+			    struct sg_table **table);
+void usb_free_noncoherent(struct usb_device *dev, size_t size,
+			  void *addr, enum dma_data_direction dir,
+			  struct sg_table *table);
 
 /*-------------------------------------------------------------------*
  *                         SYNCHRONOUS CALL SUPPORT                  *

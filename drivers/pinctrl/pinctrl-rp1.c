@@ -729,12 +729,14 @@ static int rp1_gpio_get(struct gpio_chip *chip, unsigned offset)
 	return ret;
 }
 
-static void rp1_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+static int rp1_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 {
 	struct rp1_pin_info *pin = rp1_get_pin(chip, offset);
 
 	if (pin)
 		rp1_set_value(pin, value);
+
+	return 0;
 }
 
 static int rp1_gpio_get_direction(struct gpio_chip *chip, unsigned int offset)
@@ -828,7 +830,7 @@ static void rp1_gpio_irq_handler(struct irq_desc *desc)
 		writel(RP1_GPIO_CTRL_IRQRESET,
 		       pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
 		generic_handle_irq(irq_find_mapping(pc->gpio_chip.irq.domain,
-			bank->min_gpio + b));
+						     bank->min_gpio + b));
 	}
 
 	chained_irq_exit(host_chip, desc);
@@ -1692,4 +1694,9 @@ static struct platform_driver rp1_pinctrl_driver = {
 		.suppress_bind_attrs = true,
 	},
 };
-builtin_platform_driver(rp1_pinctrl_driver);
+module_platform_driver(rp1_pinctrl_driver);
+
+MODULE_AUTHOR("Phil Elwell <phil@raspberrypi.com>");
+MODULE_AUTHOR("Andrea della Porta <andrea.porta@suse.com>");
+MODULE_DESCRIPTION("RP1 pinctrl/gpio driver");
+MODULE_LICENSE("GPL");

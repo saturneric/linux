@@ -61,7 +61,6 @@ config LMK04832
 config COMMON_CLK_APPLE_NCO
 	tristate "Clock driver for Apple SoC NCOs"
 	depends on ARCH_APPLE || COMPILE_TEST
-	default ARCH_APPLE
 	help
 	  This driver supports NCO (Numerically Controlled Oscillator) blocks
 	  found on Apple SoCs such as t8103 (M1). The blocks are typically
@@ -90,10 +89,12 @@ config COMMON_CLK_RK808
 
 config COMMON_CLK_RP1
 	tristate "Raspberry Pi RP1-based clock support"
-	depends on PCI || COMPILE_TEST
-	depends on COMMON_CLK
+	depends on MISC_RP1 || MFD_RP1 || COMPILE_TEST
+	default MISC_RP1
 	help
-	  Enable common clock framework support for Raspberry Pi RP1
+	  Enable common clock framework support for Raspberry Pi RP1.
+	  This multi-function device has 3 main PLLs and several clock
+	  generators to drive the internal sub-peripherals.
 
 config COMMON_CLK_RP1_SDIO
 	tristate "Clock driver for the RP1 SDIO interfaces"
