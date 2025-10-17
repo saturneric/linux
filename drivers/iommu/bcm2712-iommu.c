@@ -534,8 +534,6 @@ static const struct iommu_ops bcm2712_iommu_ops = {
 	.probe_device	= bcm2712_iommu_probe_device,
 	.release_device	= bcm2712_iommu_release_device,
 	.device_group	= bcm2712_iommu_device_group,
-	/* Advertise native page sizes as well as 2M, 16K which Linux may prefer */
-	.pgsize_bitmap	= (SZ_4M | SZ_2M | SZ_1M | SZ_64K | SZ_16K | SZ_4K),
 	.default_domain_ops = &bcm2712_iommu_domain_ops,
 	.of_xlate = bcm2712_iommu_of_xlate,
 };
