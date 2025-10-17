@@ -5565,19 +5565,6 @@ static void macb_remove(struct platform_device *pdev)
 	}
 }
 
-static void macb_shutdown(struct platform_device *pdev)
-{
-	struct net_device *dev;
-
-	dev = platform_get_drvdata(pdev);
-
-	rtnl_lock();
-	netif_device_detach(dev);
-	if (netif_running(dev))
-		dev_close(dev);
-	rtnl_unlock();
-}
-
 static int __maybe_unused macb_suspend(struct device *dev)
 {
 	struct net_device *netdev = dev_get_drvdata(dev);
