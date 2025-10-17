@@ -209,7 +209,7 @@ static int rpi_poe_power_supply_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ctx);
 
-	psy_cfg.of_node = pdev->dev.of_node;
+	psy_cfg.fwnode = dev_fwnode(&pdev->dev);
 	psy_cfg.drv_data = ctx;
 
 	ctx->supply = devm_power_supply_register(&pdev->dev,
