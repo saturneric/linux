@@ -235,7 +235,7 @@ static int bgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
 	return 0;
 }
 
-static void bgpio_set_direct(struct gpio_chip *gc, unsigned int gpio, int val)
+static int bgpio_set_direct(struct gpio_chip *gc, unsigned int gpio, int val)
 {
 	unsigned long mask = bgpio_line2mask(gc, gpio);
 	unsigned long flags;
@@ -357,7 +357,7 @@ static int bgpio_set_multiple_with_clear(struct gpio_chip *gc,
 	return 0;
 }
 
-static void bgpio_set_multiple_direct(struct gpio_chip *gc,
+static int bgpio_set_multiple_direct(struct gpio_chip *gc,
 				      unsigned long *mask,
 				      unsigned long *bits)
 {
@@ -376,6 +376,7 @@ static void bgpio_set_multiple_direct(struct gpio_chip *gc,
 	gc->write_reg(gc->reg_dat, gc->bgpio_data);
 
 	raw_spin_unlock_irqrestore(&gc->bgpio_lock, flags);
+	return 0;
 }
 
 static int bgpio_dir_return(struct gpio_chip *gc, unsigned int gpio, bool dir_out)
