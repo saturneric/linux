@@ -108,7 +108,9 @@ static const struct of_device_id simple_mfd_i2c_of_match[] = {
 	{ .compatible = "maxim,max5970", .data = &maxim_max5970},
 	{ .compatible = "maxim,max5978", .data = &maxim_max5970},
 	{ .compatible = "maxim,max77705-battery", .data = &maxim_mon_max77705},
-	{ .compatible = "raspberrypi,poe-core", &rpi_poe_core },
+	{ .compatible = "fsl,lx2160aqds-fpga" },
+	{ .compatible = "fsl,ls1028aqds-fpga" },
+	{ .compatible = "raspberrypi,poe-core", .data = &rpi_poe_core },
 	{ .compatible = "raspberrypi,sensehat" },
 	{}
 };
