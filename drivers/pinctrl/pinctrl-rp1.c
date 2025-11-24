@@ -37,116 +37,114 @@
 #include "pinctrl-utils.h"
 
 #define MODULE_NAME "pinctrl-rp1"
-#define RP1_NUM_GPIOS	54
-#define RP1_NUM_BANKS	3
+#define RP1_NUM_GPIOS 54
+#define RP1_NUM_BANKS 3
 
-#define RP1_RW_OFFSET			0x0000
-#define RP1_XOR_OFFSET			0x1000
-#define RP1_SET_OFFSET			0x2000
-#define RP1_CLR_OFFSET			0x3000
+#define RP1_RW_OFFSET 0x0000
+#define RP1_XOR_OFFSET 0x1000
+#define RP1_SET_OFFSET 0x2000
+#define RP1_CLR_OFFSET 0x3000
 
-#define RP1_GPIO_STATUS			0x0000
-#define RP1_GPIO_CTRL			0x0004
+#define RP1_GPIO_STATUS 0x0000
+#define RP1_GPIO_CTRL 0x0004
 
-#define RP1_GPIO_PCIE_INTE		0x011c
-#define RP1_GPIO_PCIE_INTS		0x0124
+#define RP1_GPIO_PCIE_INTE 0x011c
+#define RP1_GPIO_PCIE_INTS 0x0124
 
-#define RP1_GPIO_EVENTS_SHIFT_RAW	20
-#define RP1_GPIO_STATUS_FALLING		BIT(20)
-#define RP1_GPIO_STATUS_RISING		BIT(21)
-#define RP1_GPIO_STATUS_LOW		BIT(22)
-#define RP1_GPIO_STATUS_HIGH		BIT(23)
+#define RP1_GPIO_EVENTS_SHIFT_RAW 20
+#define RP1_GPIO_STATUS_FALLING BIT(20)
+#define RP1_GPIO_STATUS_RISING BIT(21)
+#define RP1_GPIO_STATUS_LOW BIT(22)
+#define RP1_GPIO_STATUS_HIGH BIT(23)
 
-#define RP1_GPIO_EVENTS_SHIFT_FILTERED	24
-#define RP1_GPIO_STATUS_F_FALLING	BIT(24)
-#define RP1_GPIO_STATUS_F_RISING	BIT(25)
-#define RP1_GPIO_STATUS_F_LOW		BIT(26)
-#define RP1_GPIO_STATUS_F_HIGH		BIT(27)
+#define RP1_GPIO_EVENTS_SHIFT_FILTERED 24
+#define RP1_GPIO_STATUS_F_FALLING BIT(24)
+#define RP1_GPIO_STATUS_F_RISING BIT(25)
+#define RP1_GPIO_STATUS_F_LOW BIT(26)
+#define RP1_GPIO_STATUS_F_HIGH BIT(27)
 
-#define RP1_GPIO_CTRL_FUNCSEL_LSB	0
-#define RP1_GPIO_CTRL_FUNCSEL_MASK	0x0000001f
-#define RP1_GPIO_CTRL_OUTOVER_LSB	12
-#define RP1_GPIO_CTRL_OUTOVER_MASK	0x00003000
-#define RP1_GPIO_CTRL_OEOVER_LSB	14
-#define RP1_GPIO_CTRL_OEOVER_MASK	0x0000c000
-#define RP1_GPIO_CTRL_INOVER_LSB	16
-#define RP1_GPIO_CTRL_INOVER_MASK	0x00030000
-#define RP1_GPIO_CTRL_IRQEN_FALLING	BIT(20)
-#define RP1_GPIO_CTRL_IRQEN_RISING	BIT(21)
-#define RP1_GPIO_CTRL_IRQEN_LOW		BIT(22)
-#define RP1_GPIO_CTRL_IRQEN_HIGH	BIT(23)
-#define RP1_GPIO_CTRL_IRQEN_F_FALLING	BIT(24)
-#define RP1_GPIO_CTRL_IRQEN_F_RISING	BIT(25)
-#define RP1_GPIO_CTRL_IRQEN_F_LOW	BIT(26)
-#define RP1_GPIO_CTRL_IRQEN_F_HIGH	BIT(27)
-#define RP1_GPIO_CTRL_IRQRESET		BIT(28)
-#define RP1_GPIO_CTRL_IRQOVER_LSB	30
-#define RP1_GPIO_CTRL_IRQOVER_MASK	0xc0000000
+#define RP1_GPIO_CTRL_FUNCSEL_LSB 0
+#define RP1_GPIO_CTRL_FUNCSEL_MASK 0x0000001f
+#define RP1_GPIO_CTRL_OUTOVER_LSB 12
+#define RP1_GPIO_CTRL_OUTOVER_MASK 0x00003000
+#define RP1_GPIO_CTRL_OEOVER_LSB 14
+#define RP1_GPIO_CTRL_OEOVER_MASK 0x0000c000
+#define RP1_GPIO_CTRL_INOVER_LSB 16
+#define RP1_GPIO_CTRL_INOVER_MASK 0x00030000
+#define RP1_GPIO_CTRL_IRQEN_FALLING BIT(20)
+#define RP1_GPIO_CTRL_IRQEN_RISING BIT(21)
+#define RP1_GPIO_CTRL_IRQEN_LOW BIT(22)
+#define RP1_GPIO_CTRL_IRQEN_HIGH BIT(23)
+#define RP1_GPIO_CTRL_IRQEN_F_FALLING BIT(24)
+#define RP1_GPIO_CTRL_IRQEN_F_RISING BIT(25)
+#define RP1_GPIO_CTRL_IRQEN_F_LOW BIT(26)
+#define RP1_GPIO_CTRL_IRQEN_F_HIGH BIT(27)
+#define RP1_GPIO_CTRL_IRQRESET BIT(28)
+#define RP1_GPIO_CTRL_IRQOVER_LSB 30
+#define RP1_GPIO_CTRL_IRQOVER_MASK 0xc0000000
 
-#define RP1_INT_EDGE_FALLING		BIT(0)
-#define RP1_INT_EDGE_RISING		BIT(1)
-#define RP1_INT_LEVEL_LOW		BIT(2)
-#define RP1_INT_LEVEL_HIGH		BIT(3)
-#define RP1_INT_MASK			0xf
+#define RP1_INT_EDGE_FALLING BIT(0)
+#define RP1_INT_EDGE_RISING BIT(1)
+#define RP1_INT_LEVEL_LOW BIT(2)
+#define RP1_INT_LEVEL_HIGH BIT(3)
+#define RP1_INT_MASK 0xf
 
-#define RP1_INT_EDGE_BOTH		(RP1_INT_EDGE_FALLING |	\
-					 RP1_INT_EDGE_RISING)
-#define RP1_PUD_OFF			0
-#define RP1_PUD_DOWN			1
-#define RP1_PUD_UP			2
+#define RP1_INT_EDGE_BOTH (RP1_INT_EDGE_FALLING | RP1_INT_EDGE_RISING)
+#define RP1_PUD_OFF 0
+#define RP1_PUD_DOWN 1
+#define RP1_PUD_UP 2
 
-#define RP1_FSEL_COUNT			9
+#define RP1_FSEL_COUNT 9
 
-#define RP1_FSEL_ALT0			0x00
-#define RP1_FSEL_GPIO			0x05
-#define RP1_FSEL_NONE			0x09
-#define RP1_FSEL_NONE_HW		0x1f
+#define RP1_FSEL_ALT0 0x00
+#define RP1_FSEL_GPIO 0x05
+#define RP1_FSEL_NONE 0x09
+#define RP1_FSEL_NONE_HW 0x1f
 
-#define RP1_DIR_OUTPUT			0
-#define RP1_DIR_INPUT			1
+#define RP1_DIR_OUTPUT 0
+#define RP1_DIR_INPUT 1
 
-#define RP1_OUTOVER_PERI		0
-#define RP1_OUTOVER_INVPERI		1
-#define RP1_OUTOVER_LOW			2
-#define RP1_OUTOVER_HIGH		3
+#define RP1_OUTOVER_PERI 0
+#define RP1_OUTOVER_INVPERI 1
+#define RP1_OUTOVER_LOW 2
+#define RP1_OUTOVER_HIGH 3
 
-#define RP1_OEOVER_PERI			0
-#define RP1_OEOVER_INVPERI		1
-#define RP1_OEOVER_DISABLE		2
-#define RP1_OEOVER_ENABLE		3
+#define RP1_OEOVER_PERI 0
+#define RP1_OEOVER_INVPERI 1
+#define RP1_OEOVER_DISABLE 2
+#define RP1_OEOVER_ENABLE 3
 
-#define RP1_INOVER_PERI			0
-#define RP1_INOVER_INVPERI		1
-#define RP1_INOVER_LOW			2
-#define RP1_INOVER_HIGH			3
+#define RP1_INOVER_PERI 0
+#define RP1_INOVER_INVPERI 1
+#define RP1_INOVER_LOW 2
+#define RP1_INOVER_HIGH 3
 
-#define RP1_RIO_OUT			0x00
-#define RP1_RIO_OE			0x04
-#define RP1_RIO_IN			0x08
+#define RP1_RIO_OUT 0x00
+#define RP1_RIO_OE 0x04
+#define RP1_RIO_IN 0x08
 
-#define RP1_PAD_SLEWFAST_MASK		0x00000001
-#define RP1_PAD_SLEWFAST_LSB		0
-#define RP1_PAD_SCHMITT_MASK		0x00000002
-#define RP1_PAD_SCHMITT_LSB		1
-#define RP1_PAD_PULL_MASK		0x0000000c
-#define RP1_PAD_PULL_LSB		2
-#define RP1_PAD_DRIVE_MASK		0x00000030
-#define RP1_PAD_DRIVE_LSB		4
-#define RP1_PAD_IN_ENABLE_MASK		0x00000040
-#define RP1_PAD_IN_ENABLE_LSB		6
-#define RP1_PAD_OUT_DISABLE_MASK	0x00000080
-#define RP1_PAD_OUT_DISABLE_LSB		7
+#define RP1_PAD_SLEWFAST_MASK 0x00000001
+#define RP1_PAD_SLEWFAST_LSB 0
+#define RP1_PAD_SCHMITT_MASK 0x00000002
+#define RP1_PAD_SCHMITT_LSB 1
+#define RP1_PAD_PULL_MASK 0x0000000c
+#define RP1_PAD_PULL_LSB 2
+#define RP1_PAD_DRIVE_MASK 0x00000030
+#define RP1_PAD_DRIVE_LSB 4
+#define RP1_PAD_IN_ENABLE_MASK 0x00000040
+#define RP1_PAD_IN_ENABLE_LSB 6
+#define RP1_PAD_OUT_DISABLE_MASK 0x00000080
+#define RP1_PAD_OUT_DISABLE_LSB 7
 
-#define RP1_PAD_DRIVE_2MA		0x00000000
-#define RP1_PAD_DRIVE_4MA		0x00000010
-#define RP1_PAD_DRIVE_8MA		0x00000020
-#define RP1_PAD_DRIVE_12MA		0x00000030
+#define RP1_PAD_DRIVE_2MA 0x00000000
+#define RP1_PAD_DRIVE_4MA 0x00000010
+#define RP1_PAD_DRIVE_8MA 0x00000020
+#define RP1_PAD_DRIVE_12MA 0x00000030
 
-#define FLD_GET(r, f) (((r) & (f ## _MASK)) >> (f ## _LSB))
-#define FLD_SET(r, f, v) r = (((r) & ~(f ## _MASK)) | ((v) << (f ## _LSB)))
+#define FLD_GET(r, f) (((r) & (f##_MASK)) >> (f##_LSB))
+#define FLD_SET(r, f, v) r = (((r) & ~(f##_MASK)) | ((v) << (f##_LSB)))
 
-#define FUNC(f) \
-	[func_##f] = #f
+#define FUNC(f) [func_##f] = #f
 #define RP1_MAX_FSEL 8
 #define PIN(i, f0, f1, f2, f3, f4, f5, f6, f7, f8) \
 	[i] = { \
@@ -163,16 +161,10 @@
 		}, \
 	}
 
-#define LEGACY_MAP(n, f0, f1, f2, f3, f4, f5) \
-	[n] = { \
-		func_gpio, \
-		func_gpio, \
-		func_##f5, \
-		func_##f4, \
-		func_##f0, \
-		func_##f1, \
-		func_##f2, \
-		func_##f3, \
+#define LEGACY_MAP(n, f0, f1, f2, f3, f4, f5)               \
+	[n] = {                                             \
+		func_gpio, func_gpio, func_##f5, func_##f4, \
+		func_##f0, func_##f1, func_##f2, func_##f3, \
 	}
 
 struct rp1_iobank_desc {
@@ -290,192 +282,64 @@ struct rp1_pinctrl {
 
 const struct rp1_iobank_desc rp1_iobanks[RP1_NUM_BANKS] = {
 	/*         gpio   inte    ints     rio    pads */
-	{  0, 28, 0x0000, 0x011c, 0x0124, 0x0000, 0x0004 },
-	{ 28,  6, 0x4000, 0x411c, 0x4124, 0x4000, 0x4004 },
+	{ 0, 28, 0x0000, 0x011c, 0x0124, 0x0000, 0x0004 },
+	{ 28, 6, 0x4000, 0x411c, 0x4124, 0x4000, 0x4004 },
 	{ 34, 20, 0x8000, 0x811c, 0x8124, 0x8000, 0x8004 },
 };
 
 /* pins are just named GPIO0..GPIO53 */
 #define RP1_GPIO_PIN(a) PINCTRL_PIN(a, "gpio" #a)
 static struct pinctrl_pin_desc rp1_gpio_pins[] = {
-	RP1_GPIO_PIN(0),
-	RP1_GPIO_PIN(1),
-	RP1_GPIO_PIN(2),
-	RP1_GPIO_PIN(3),
-	RP1_GPIO_PIN(4),
-	RP1_GPIO_PIN(5),
-	RP1_GPIO_PIN(6),
-	RP1_GPIO_PIN(7),
-	RP1_GPIO_PIN(8),
-	RP1_GPIO_PIN(9),
-	RP1_GPIO_PIN(10),
-	RP1_GPIO_PIN(11),
-	RP1_GPIO_PIN(12),
-	RP1_GPIO_PIN(13),
-	RP1_GPIO_PIN(14),
-	RP1_GPIO_PIN(15),
-	RP1_GPIO_PIN(16),
-	RP1_GPIO_PIN(17),
-	RP1_GPIO_PIN(18),
-	RP1_GPIO_PIN(19),
-	RP1_GPIO_PIN(20),
-	RP1_GPIO_PIN(21),
-	RP1_GPIO_PIN(22),
-	RP1_GPIO_PIN(23),
-	RP1_GPIO_PIN(24),
-	RP1_GPIO_PIN(25),
-	RP1_GPIO_PIN(26),
-	RP1_GPIO_PIN(27),
-	RP1_GPIO_PIN(28),
-	RP1_GPIO_PIN(29),
-	RP1_GPIO_PIN(30),
-	RP1_GPIO_PIN(31),
-	RP1_GPIO_PIN(32),
-	RP1_GPIO_PIN(33),
-	RP1_GPIO_PIN(34),
-	RP1_GPIO_PIN(35),
-	RP1_GPIO_PIN(36),
-	RP1_GPIO_PIN(37),
-	RP1_GPIO_PIN(38),
-	RP1_GPIO_PIN(39),
-	RP1_GPIO_PIN(40),
-	RP1_GPIO_PIN(41),
-	RP1_GPIO_PIN(42),
-	RP1_GPIO_PIN(43),
-	RP1_GPIO_PIN(44),
-	RP1_GPIO_PIN(45),
-	RP1_GPIO_PIN(46),
-	RP1_GPIO_PIN(47),
-	RP1_GPIO_PIN(48),
-	RP1_GPIO_PIN(49),
-	RP1_GPIO_PIN(50),
-	RP1_GPIO_PIN(51),
-	RP1_GPIO_PIN(52),
-	RP1_GPIO_PIN(53),
+	RP1_GPIO_PIN(0),  RP1_GPIO_PIN(1),  RP1_GPIO_PIN(2),  RP1_GPIO_PIN(3),
+	RP1_GPIO_PIN(4),  RP1_GPIO_PIN(5),  RP1_GPIO_PIN(6),  RP1_GPIO_PIN(7),
+	RP1_GPIO_PIN(8),  RP1_GPIO_PIN(9),  RP1_GPIO_PIN(10), RP1_GPIO_PIN(11),
+	RP1_GPIO_PIN(12), RP1_GPIO_PIN(13), RP1_GPIO_PIN(14), RP1_GPIO_PIN(15),
+	RP1_GPIO_PIN(16), RP1_GPIO_PIN(17), RP1_GPIO_PIN(18), RP1_GPIO_PIN(19),
+	RP1_GPIO_PIN(20), RP1_GPIO_PIN(21), RP1_GPIO_PIN(22), RP1_GPIO_PIN(23),
+	RP1_GPIO_PIN(24), RP1_GPIO_PIN(25), RP1_GPIO_PIN(26), RP1_GPIO_PIN(27),
+	RP1_GPIO_PIN(28), RP1_GPIO_PIN(29), RP1_GPIO_PIN(30), RP1_GPIO_PIN(31),
+	RP1_GPIO_PIN(32), RP1_GPIO_PIN(33), RP1_GPIO_PIN(34), RP1_GPIO_PIN(35),
+	RP1_GPIO_PIN(36), RP1_GPIO_PIN(37), RP1_GPIO_PIN(38), RP1_GPIO_PIN(39),
+	RP1_GPIO_PIN(40), RP1_GPIO_PIN(41), RP1_GPIO_PIN(42), RP1_GPIO_PIN(43),
+	RP1_GPIO_PIN(44), RP1_GPIO_PIN(45), RP1_GPIO_PIN(46), RP1_GPIO_PIN(47),
+	RP1_GPIO_PIN(48), RP1_GPIO_PIN(49), RP1_GPIO_PIN(50), RP1_GPIO_PIN(51),
+	RP1_GPIO_PIN(52), RP1_GPIO_PIN(53),
 };
 
 /* one pin per group */
-static const char * const rp1_gpio_groups[] = {
-	"gpio0",
-	"gpio1",
-	"gpio2",
-	"gpio3",
-	"gpio4",
-	"gpio5",
-	"gpio6",
-	"gpio7",
-	"gpio8",
-	"gpio9",
-	"gpio10",
-	"gpio11",
-	"gpio12",
-	"gpio13",
-	"gpio14",
-	"gpio15",
-	"gpio16",
-	"gpio17",
-	"gpio18",
-	"gpio19",
-	"gpio20",
-	"gpio21",
-	"gpio22",
-	"gpio23",
-	"gpio24",
-	"gpio25",
-	"gpio26",
-	"gpio27",
-	"gpio28",
-	"gpio29",
-	"gpio30",
-	"gpio31",
-	"gpio32",
-	"gpio33",
-	"gpio34",
-	"gpio35",
-	"gpio36",
-	"gpio37",
-	"gpio38",
-	"gpio39",
-	"gpio40",
-	"gpio41",
-	"gpio42",
-	"gpio43",
-	"gpio44",
-	"gpio45",
-	"gpio46",
-	"gpio47",
-	"gpio48",
-	"gpio49",
-	"gpio50",
-	"gpio51",
-	"gpio52",
-	"gpio53",
+static const char *const rp1_gpio_groups[] = {
+	"gpio0",  "gpio1",  "gpio2",  "gpio3",	"gpio4",  "gpio5",  "gpio6",
+	"gpio7",  "gpio8",  "gpio9",  "gpio10", "gpio11", "gpio12", "gpio13",
+	"gpio14", "gpio15", "gpio16", "gpio17", "gpio18", "gpio19", "gpio20",
+	"gpio21", "gpio22", "gpio23", "gpio24", "gpio25", "gpio26", "gpio27",
+	"gpio28", "gpio29", "gpio30", "gpio31", "gpio32", "gpio33", "gpio34",
+	"gpio35", "gpio36", "gpio37", "gpio38", "gpio39", "gpio40", "gpio41",
+	"gpio42", "gpio43", "gpio44", "gpio45", "gpio46", "gpio47", "gpio48",
+	"gpio49", "gpio50", "gpio51", "gpio52", "gpio53",
 };
 
-static const char * const rp1_func_names[] = {
-	FUNC(alt0),
-	FUNC(alt1),
-	FUNC(alt2),
-	FUNC(alt3),
-	FUNC(alt4),
-	FUNC(gpio),
-	FUNC(alt6),
-	FUNC(alt7),
-	FUNC(alt8),
-	FUNC(none),
-	FUNC(aaud),
-	FUNC(dcd0),
-	FUNC(dpi),
-	FUNC(dsi0_te_ext),
-	FUNC(dsi1_te_ext),
-	FUNC(dsr0),
-	FUNC(dtr0),
-	FUNC(gpclk0),
-	FUNC(gpclk1),
-	FUNC(gpclk2),
-	FUNC(gpclk3),
-	FUNC(gpclk4),
-	FUNC(gpclk5),
-	FUNC(i2c0),
-	FUNC(i2c1),
-	FUNC(i2c2),
-	FUNC(i2c3),
-	FUNC(i2c4),
-	FUNC(i2c5),
-	FUNC(i2c6),
-	FUNC(i2s0),
-	FUNC(i2s1),
-	FUNC(i2s2),
-	FUNC(ir),
-	FUNC(mic),
-	FUNC(pcie_clkreq_n),
-	FUNC(pio),
-	FUNC(proc_rio),
-	FUNC(pwm0),
-	FUNC(pwm1),
-	FUNC(ri0),
-	FUNC(sd0),
-	FUNC(sd1),
-	FUNC(spi0),
-	FUNC(spi1),
-	FUNC(spi2),
-	FUNC(spi3),
-	FUNC(spi4),
-	FUNC(spi5),
-	FUNC(spi6),
-	FUNC(spi7),
-	FUNC(spi8),
-	FUNC(uart0),
-	FUNC(uart1),
-	FUNC(uart2),
-	FUNC(uart3),
-	FUNC(uart4),
-	FUNC(uart5),
-	FUNC(vbus0),
-	FUNC(vbus1),
-	FUNC(vbus2),
-	FUNC(vbus3),
-	[func_invalid] = "?"
+static const char *const rp1_func_names[] = {
+	FUNC(alt0),   FUNC(alt1),	 FUNC(alt2),
+	FUNC(alt3),   FUNC(alt4),	 FUNC(gpio),
+	FUNC(alt6),   FUNC(alt7),	 FUNC(alt8),
+	FUNC(none),   FUNC(aaud),	 FUNC(dcd0),
+	FUNC(dpi),    FUNC(dsi0_te_ext), FUNC(dsi1_te_ext),
+	FUNC(dsr0),   FUNC(dtr0),	 FUNC(gpclk0),
+	FUNC(gpclk1), FUNC(gpclk2),	 FUNC(gpclk3),
+	FUNC(gpclk4), FUNC(gpclk5),	 FUNC(i2c0),
+	FUNC(i2c1),   FUNC(i2c2),	 FUNC(i2c3),
+	FUNC(i2c4),   FUNC(i2c5),	 FUNC(i2c6),
+	FUNC(i2s0),   FUNC(i2s1),	 FUNC(i2s2),
+	FUNC(ir),     FUNC(mic),	 FUNC(pcie_clkreq_n),
+	FUNC(pio),    FUNC(proc_rio),	 FUNC(pwm0),
+	FUNC(pwm1),   FUNC(ri0),	 FUNC(sd0),
+	FUNC(sd1),    FUNC(spi0),	 FUNC(spi1),
+	FUNC(spi2),   FUNC(spi3),	 FUNC(spi4),
+	FUNC(spi5),   FUNC(spi6),	 FUNC(spi7),
+	FUNC(spi8),   FUNC(uart0),	 FUNC(uart1),
+	FUNC(uart2),  FUNC(uart3),	 FUNC(uart4),
+	FUNC(uart5),  FUNC(vbus0),	 FUNC(vbus1),
+	FUNC(vbus2),  FUNC(vbus3),	 [func_invalid] = "?"
 };
 
 static const struct rp1_pin_funcs rp1_gpio_pin_funcs[] = {
@@ -566,7 +430,7 @@ static const u8 legacy_fsel_map[][8] = {
 	LEGACY_MAP(27, sd0, _, dpi, _, _, _),
 };
 
-static const char * const irq_type_names[] = {
+static const char *const irq_type_names[] = {
 	[IRQ_TYPE_NONE] = "none",
 	[IRQ_TYPE_EDGE_RISING] = "edge-rising",
 	[IRQ_TYPE_EDGE_FALLING] = "edge-falling",
@@ -577,13 +441,17 @@ static const char * const irq_type_names[] = {
 
 static bool persist_gpio_outputs = true;
 module_param(persist_gpio_outputs, bool, 0644);
-MODULE_PARM_DESC(persist_gpio_outputs, "Enable GPIO_OUT persistence when pin is freed");
+MODULE_PARM_DESC(persist_gpio_outputs,
+		 "Enable GPIO_OUT persistence when pin is freed");
 
 static bool pace_pin_updates = true;
 module_param(pace_pin_updates, bool, 0644);
-MODULE_PARM_DESC(pace_pin_updates, "Update pin states with guaranteed monotonicity if PCIe ASPM is enabled");
+MODULE_PARM_DESC(
+	pace_pin_updates,
+	"Update pin states with guaranteed monotonicity if PCIe ASPM is enabled");
 
-static inline void rp1_pin_writel(u32 val, void __iomem *dummy, void __iomem *reg)
+static inline void rp1_pin_writel(u32 val, void __iomem *dummy,
+				  void __iomem *reg)
 {
 	unsigned long flags;
 
@@ -615,9 +483,8 @@ static inline u32 rp1_pin_readl(const void __iomem *ioaddr)
 	return readl(ioaddr);
 }
 
-static int rp1_pinconf_set(struct pinctrl_dev *pctldev,
-			   unsigned int offset, unsigned long *configs,
-			   unsigned int num_configs);
+static int rp1_pinconf_set(struct pinctrl_dev *pctldev, unsigned int offset,
+			   unsigned long *configs, unsigned int num_configs);
 
 static struct rp1_pin_info *rp1_get_pin(struct gpio_chip *chip,
 					unsigned int offset)
@@ -696,14 +563,16 @@ static void rp1_set_fsel(struct rp1_pin_info *pin, u32 fsel)
 static int rp1_get_dir(struct rp1_pin_info *pin)
 {
 	return !(rp1_pin_readl(pin->rio + RP1_RIO_OE) & (1 << pin->offset)) ?
-		RP1_DIR_INPUT : RP1_DIR_OUTPUT;
+		       RP1_DIR_INPUT :
+		       RP1_DIR_OUTPUT;
 }
 
 static void rp1_set_dir(struct rp1_pin_info *pin, bool is_input)
 {
 	int offset = is_input ? RP1_CLR_OFFSET : RP1_SET_OFFSET;
 
-	rp1_pin_writel(1 << pin->offset, pin->dummy, pin->rio + RP1_RIO_OE + offset);
+	rp1_pin_writel(1 << pin->offset, pin->dummy,
+		       pin->rio + RP1_RIO_OE + offset);
 }
 
 static int rp1_get_value(struct rp1_pin_info *pin)
@@ -715,7 +584,8 @@ static void rp1_set_value(struct rp1_pin_info *pin, int value)
 {
 	/* Assume the pin is already an output */
 	rp1_pin_writel(1 << pin->offset, pin->dummy,
-		       pin->rio + RP1_RIO_OUT + (value ? RP1_SET_OFFSET : RP1_CLR_OFFSET));
+		       pin->rio + RP1_RIO_OUT +
+			       (value ? RP1_SET_OFFSET : RP1_CLR_OFFSET));
 }
 
 static int rp1_gpio_get(struct gpio_chip *chip, unsigned offset)
@@ -749,9 +619,8 @@ static int rp1_gpio_get_direction(struct gpio_chip *chip, unsigned int offset)
 	fsel = rp1_get_fsel(pin);
 	if (fsel != RP1_FSEL_GPIO)
 		return -EINVAL;
-	return (rp1_get_dir(pin) == RP1_DIR_OUTPUT) ?
-		GPIO_LINE_DIRECTION_OUT :
-		GPIO_LINE_DIRECTION_IN;
+	return (rp1_get_dir(pin) == RP1_DIR_OUTPUT) ? GPIO_LINE_DIRECTION_OUT :
+						      GPIO_LINE_DIRECTION_IN;
 }
 
 static int rp1_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
@@ -785,7 +654,7 @@ static int rp1_gpio_set_config(struct gpio_chip *gc, unsigned offset,
 	unsigned long configs[] = { config };
 
 	return rp1_pinconf_set(pc->pctl_dev, offset, configs,
-			      ARRAY_SIZE(configs));
+			       ARRAY_SIZE(configs));
 }
 
 static const struct gpio_chip rp1_gpio_chip = {
@@ -825,12 +694,13 @@ static void rp1_gpio_irq_handler(struct irq_desc *desc)
 
 	ints = readl(pc->gpio_base + bank->ints_offset);
 	for_each_set_bit(b, &ints, 32) {
-		struct rp1_pin_info *pin = rp1_get_pin(chip, bank->min_gpio + b);
+		struct rp1_pin_info *pin =
+			rp1_get_pin(chip, bank->min_gpio + b);
 
 		writel(RP1_GPIO_CTRL_IRQRESET,
 		       pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
 		generic_handle_irq(irq_find_mapping(pc->gpio_chip.irq.domain,
-						     bank->min_gpio + b));
+						    bank->min_gpio + b));
 	}
 
 	chained_irq_exit(host_chip, desc);
@@ -897,7 +767,7 @@ static int rp1_irq_set_type(struct rp1_pin_info *pin, unsigned int type)
 	       pin->gpio + RP1_CLR_OFFSET + RP1_GPIO_CTRL);
 	/* Clear any latched events */
 	writel(RP1_GPIO_CTRL_IRQRESET,
-		pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
+	       pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
 	/* Enable the events that are needed */
 	writel(irq_flags << RP1_GPIO_EVENTS_SHIFT_RAW,
 	       pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
@@ -938,10 +808,12 @@ static void rp1_gpio_irq_ack(struct irq_data *data)
 	struct rp1_pin_info *pin = rp1_get_pin(chip, gpio);
 
 	/* Clear any latched events */
-	writel(RP1_GPIO_CTRL_IRQRESET, pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
+	writel(RP1_GPIO_CTRL_IRQRESET,
+	       pin->gpio + RP1_SET_OFFSET + RP1_GPIO_CTRL);
 }
 
-static int rp1_gpio_irq_set_affinity(struct irq_data *data, const struct cpumask *dest, bool force)
+static int rp1_gpio_irq_set_affinity(struct irq_data *data,
+				     const struct cpumask *dest, bool force)
 {
 	struct gpio_chip *chip = irq_data_get_irq_chip_data(data);
 	struct rp1_pinctrl *pc = gpiochip_get_data(chip);
@@ -959,7 +831,8 @@ static int rp1_gpio_irq_set_affinity(struct irq_data *data, const struct cpumask
 	}
 
 	if (parent_data && parent_data->chip->irq_set_affinity)
-		return parent_data->chip->irq_set_affinity(parent_data, dest, force);
+		return parent_data->chip->irq_set_affinity(parent_data, dest,
+							   force);
 
 	return -EINVAL;
 }
@@ -999,8 +872,7 @@ static enum funcs rp1_get_fsel_func(unsigned pin, unsigned fsel)
 }
 
 static int rp1_pctl_get_group_pins(struct pinctrl_dev *pctldev,
-				   unsigned selector,
-				   const unsigned **pins,
+				   unsigned selector, const unsigned **pins,
 				   unsigned *num_pins)
 {
 	*pins = &rp1_gpio_pins[selector].number;
@@ -1010,8 +882,7 @@ static int rp1_pctl_get_group_pins(struct pinctrl_dev *pctldev,
 }
 
 static void rp1_pctl_pin_dbg_show(struct pinctrl_dev *pctldev,
-				  struct seq_file *s,
-				  unsigned offset)
+				  struct seq_file *s, unsigned offset)
 {
 	struct rp1_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
 	struct gpio_chip *chip = &pc->gpio_chip;
@@ -1023,8 +894,7 @@ static void rp1_pctl_pin_dbg_show(struct pinctrl_dev *pctldev,
 
 	seq_printf(s, "function %s (%s) in %s; irq %d (%s)",
 		   rp1_func_names[fsel], rp1_func_names[func],
-		   value ? "hi" : "lo",
-		   irq, irq_type_names[pin->irq_type]);
+		   value ? "hi" : "lo", irq, irq_type_names[pin->irq_type]);
 }
 
 static void rp1_pctl_dt_free_map(struct pinctrl_dev *pctldev,
@@ -1057,14 +927,14 @@ static int rp1_pctl_legacy_map_func(struct rp1_pinctrl *pc,
 	} else if (fnum < 2) {
 		func = func_gpio;
 	} else {
-		dev_err(pc->dev, "%pOF: invalid brcm,pins value %d\n",
-			np, pin);
+		dev_err(pc->dev, "%pOF: invalid brcm,pins value %d\n", np, pin);
 		return -EINVAL;
 	}
 
 	if (func == func_invalid) {
-		dev_err(pc->dev, "%pOF: brcm,function %d not supported on pin %d\n",
-			np, fnum, pin);
+		dev_err(pc->dev,
+			"%pOF: brcm,function %d not supported on pin %d\n", np,
+			fnum, pin);
 	}
 
 	map->type = PIN_MAP_TYPE_MUX_GROUP;
@@ -1133,7 +1003,8 @@ static int rp1_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 	pins = of_find_property(np, "brcm,pins", NULL);
 
 	if (!pins) /* Assume generic bindings in this node */
-		return pinconf_generic_dt_node_to_map_all(pctldev, np, map, num_maps);
+		return pinconf_generic_dt_node_to_map_all(pctldev, np, map,
+							  num_maps);
 
 	funcs = of_find_property(np, "brcm,function", NULL);
 	if (!funcs)
@@ -1141,7 +1012,8 @@ static int rp1_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 
 	pulls = of_find_property(np, "brcm,pull", NULL);
 	if (!pulls)
-		pinconf_generic_parse_dt_config(np, pctldev, &configs, &num_configs);
+		pinconf_generic_parse_dt_config(np, pctldev, &configs,
+						&num_configs);
 
 	if (!function && !funcs && !num_configs && !pulls) {
 		dev_err(pc->dev,
@@ -1156,14 +1028,13 @@ static int rp1_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 
 	if (num_funcs > 1 && num_funcs != num_pins) {
 		dev_err(pc->dev,
-			"%pOF: brcm,function must have 1 or %d entries\n",
-			np, num_pins);
+			"%pOF: brcm,function must have 1 or %d entries\n", np,
+			num_pins);
 		return -EINVAL;
 	}
 
 	if (num_pulls > 1 && num_pulls != num_pins) {
-		dev_err(pc->dev,
-			"%pOF: brcm,pull must have 1 or %d entries\n",
+		dev_err(pc->dev, "%pOF: brcm,pull must have 1 or %d entries\n",
 			np, num_pins);
 		return -EINVAL;
 	}
@@ -1185,37 +1056,35 @@ static int rp1_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 		if (err)
 			goto out;
 		if (num_funcs) {
-			err = of_property_read_u32_index(np, "brcm,function",
-							 (num_funcs > 1) ? i : 0,
-							 &func);
+			err = of_property_read_u32_index(
+				np, "brcm,function", (num_funcs > 1) ? i : 0,
+				&func);
 			if (err)
 				goto out;
-			err = rp1_pctl_legacy_map_func(pc, np, pin, func,
-						       maps, num_maps);
+			err = rp1_pctl_legacy_map_func(pc, np, pin, func, maps,
+						       num_maps);
 		} else if (function) {
-			err = pinctrl_utils_add_map_mux(pctldev, &maps,
-							&reserved_maps, num_maps,
-							rp1_gpio_groups[pin],
-							function);
+			err = pinctrl_utils_add_map_mux(
+				pctldev, &maps, &reserved_maps, num_maps,
+				rp1_gpio_groups[pin], function);
 		}
 
 		if (err)
 			goto out;
 
 		if (num_pulls) {
-			err = of_property_read_u32_index(np, "brcm,pull",
-							 (num_pulls > 1) ? i : 0,
-							 &pull);
+			err = of_property_read_u32_index(
+				np, "brcm,pull", (num_pulls > 1) ? i : 0,
+				&pull);
 			if (err)
 				goto out;
-			err = rp1_pctl_legacy_map_pull(pc, np, pin, pull,
-						       maps, num_maps);
+			err = rp1_pctl_legacy_map_pull(pc, np, pin, pull, maps,
+						       num_maps);
 		} else if (num_configs) {
-			err = pinctrl_utils_add_map_configs(pctldev, &maps,
-							    &reserved_maps, num_maps,
-							    rp1_gpio_groups[pin],
-							    configs, num_configs,
-							    PIN_MAP_TYPE_CONFIGS_PIN);
+			err = pinctrl_utils_add_map_configs(
+				pctldev, &maps, &reserved_maps, num_maps,
+				rp1_gpio_groups[pin], configs, num_configs,
+				PIN_MAP_TYPE_CONFIGS_PIN);
 		}
 
 		if (err)
@@ -1268,8 +1137,8 @@ static const char *rp1_pmx_get_function_name(struct pinctrl_dev *pctldev,
 
 static int rp1_pmx_get_function_groups(struct pinctrl_dev *pctldev,
 				       unsigned selector,
-				       const char * const **groups,
-				       unsigned * const num_groups)
+				       const char *const **groups,
+				       unsigned *const num_groups)
 {
 	/* every pin can do every function */
 	*groups = rp1_gpio_groups;
@@ -1315,8 +1184,7 @@ static void rp1_pmx_gpio_disable_free(struct pinctrl_dev *pctldev,
 
 static int rp1_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
 				      struct pinctrl_gpio_range *range,
-				      unsigned offset,
-				      bool input)
+				      unsigned offset, bool input)
 {
 	struct rp1_pin_info *pin = rp1_get_pin_pctl(pctldev, offset);
 
@@ -1470,14 +1338,17 @@ static int rp1_pinconf_get(struct pinctrl_dev *pctldev, unsigned offset,
 		}
 		break;
 	case PIN_CONFIG_BIAS_DISABLE:
-		arg = ((padctrl & RP1_PAD_PULL_MASK) == (RP1_PUD_OFF << RP1_PAD_PULL_LSB));
+		arg = ((padctrl & RP1_PAD_PULL_MASK) ==
+		       (RP1_PUD_OFF << RP1_PAD_PULL_LSB));
 		break;
 	case PIN_CONFIG_BIAS_PULL_DOWN:
-		arg = ((padctrl & RP1_PAD_PULL_MASK) == (RP1_PUD_DOWN << RP1_PAD_PULL_LSB));
+		arg = ((padctrl & RP1_PAD_PULL_MASK) ==
+		       (RP1_PUD_DOWN << RP1_PAD_PULL_LSB));
 		break;
 
 	case PIN_CONFIG_BIAS_PULL_UP:
-		arg = ((padctrl & RP1_PAD_PULL_MASK) == (RP1_PUD_UP << RP1_PAD_PULL_LSB));
+		arg = ((padctrl & RP1_PAD_PULL_MASK) ==
+		       (RP1_PUD_UP << RP1_PAD_PULL_LSB));
 		break;
 	default:
 		return -ENOTSUPP;
@@ -1514,100 +1385,7 @@ static const struct of_device_id rp1_pinctrl_match[] = {
 		.compatible = "raspberrypi,rp1-gpio",
 		.data = &rp1_pinconf_ops,
 	},
-	{},
-};
-MODULE_DEVICE_TABLE(of, rp1_pinctrl_match);
-
-static struct rp1_pinctrl rp1_pinctrl_data = {};
-
-static const struct regmap_range rp1_gpio_reg_ranges[] = {
-	/* BANK 0 */
-	regmap_reg_range(0x2004, 0x20dc),
-	regmap_reg_range(0x3004, 0x30dc),
-	regmap_reg_range(0x0004, 0x00dc),
-	regmap_reg_range(0x0124, 0x0124),
-	regmap_reg_range(0x211c, 0x211c),
-	regmap_reg_range(0x311c, 0x311c),
-	/* BANK 1 */
-	regmap_reg_range(0x6004, 0x602c),
-	regmap_reg_range(0x7004, 0x702c),
-	regmap_reg_range(0x4004, 0x402c),
-	regmap_reg_range(0x4124, 0x4124),
-	regmap_reg_range(0x611c, 0x611c),
-	regmap_reg_range(0x711c, 0x711c),
-	/* BANK 2 */
-	regmap_reg_range(0xa004, 0xa09c),
-	regmap_reg_range(0xb004, 0xb09c),
-	regmap_reg_range(0x8004, 0x809c),
-	regmap_reg_range(0x8124, 0x8124),
-	regmap_reg_range(0xa11c, 0xa11c),
-	regmap_reg_range(0xb11c, 0xb11c),
-};
-
-static const struct regmap_range rp1_rio_reg_ranges[] = {
-	/* BANK 0 */
-	regmap_reg_range(0x2000, 0x2004),
-	regmap_reg_range(0x3000, 0x3004),
-	regmap_reg_range(0x0004, 0x0008),
-	/* BANK 1 */
-	regmap_reg_range(0x6000, 0x6004),
-	regmap_reg_range(0x7000, 0x7004),
-	regmap_reg_range(0x4004, 0x4008),
-	/* BANK 2 */
-	regmap_reg_range(0xa000, 0xa004),
-	regmap_reg_range(0xb000, 0xb004),
-	regmap_reg_range(0x8004, 0x8008),
-};
-
-static const struct regmap_range rp1_pads_reg_ranges[] = {
-	/* BANK 0 */
-	regmap_reg_range(0x0004, 0x0070),
-	/* BANK 1 */
-	regmap_reg_range(0x4004, 0x4018),
-	/* BANK 2 */
-	regmap_reg_range(0x8004, 0x8050),
-};
-
-static const struct regmap_access_table rp1_gpio_reg_table = {
-	.yes_ranges = rp1_gpio_reg_ranges,
-	.n_yes_ranges = ARRAY_SIZE(rp1_gpio_reg_ranges),
-};
-
-static const struct regmap_access_table rp1_rio_reg_table = {
-	.yes_ranges = rp1_rio_reg_ranges,
-	.n_yes_ranges = ARRAY_SIZE(rp1_rio_reg_ranges),
-};
-
-static const struct regmap_access_table rp1_pads_reg_table = {
-	.yes_ranges = rp1_pads_reg_ranges,
-	.n_yes_ranges = ARRAY_SIZE(rp1_pads_reg_ranges),
-};
-
-static const struct regmap_config rp1_pinctrl_gpio_regmap_cfg = {
-	.reg_bits = 32,
-	.val_bits = 32,
-	.reg_stride = 4,
-	.rd_table = &rp1_gpio_reg_table,
-	.name = "rp1-gpio",
-	.max_register = 0xb11c,
-};
-
-static const struct regmap_config rp1_pinctrl_rio_regmap_cfg = {
-	.reg_bits = 32,
-	.val_bits = 32,
-	.reg_stride = 4,
-	.rd_table = &rp1_rio_reg_table,
-	.name = "rp1-rio",
-	.max_register = 0xb004,
-};
-
-static const struct regmap_config rp1_pinctrl_pads_regmap_cfg = {
-	.reg_bits = 32,
-	.val_bits = 32,
-	.reg_stride = 4,
-	.rd_table = &rp1_pads_reg_table,
-	.name = "rp1-pads",
-	.max_register = 0x8050,
+	{}
 };
 
 static inline void __iomem *devm_auto_iomap(struct platform_device *pdev,
@@ -1662,32 +1440,42 @@ static int rp1_pinctrl_probe(struct platform_device *pdev)
 	pc->gpio_chip = rp1_gpio_chip;
 	pc->gpio_chip.parent = dev;
 
-	pc->gpio_base = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(pc->gpio_base))
-		return dev_err_probe(dev, PTR_ERR(pc->gpio_base), "could not get GPIO IO memory\n");
-
-	pc->rio_base = devm_platform_ioremap_resource(pdev, 1);
-	if (IS_ERR(pc->rio_base))
-		return dev_err_probe(dev, PTR_ERR(pc->rio_base), "could not get RIO IO memory\n");
-
-	pc->pads_base = devm_platform_ioremap_resource(pdev, 2);
-	if (IS_ERR(pc->pads_base))
-		return dev_err_probe(dev, PTR_ERR(pc->pads_base), "could not get PADS IO memory\n");
-
-	gpio_regmap = devm_regmap_init_mmio(dev, pc->gpio_base,
-					    &rp1_pinctrl_gpio_regmap_cfg);
-	if (IS_ERR(gpio_regmap))
-		return dev_err_probe(dev, PTR_ERR(gpio_regmap), "could not init GPIO regmap\n");
-
-	rio_regmap = devm_regmap_init_mmio(dev, pc->rio_base,
-					   &rp1_pinctrl_rio_regmap_cfg);
-	if (IS_ERR(rio_regmap))
-		return dev_err_probe(dev, PTR_ERR(rio_regmap), "could not init RIO regmap\n");
-
-	pads_regmap = devm_regmap_init_mmio(dev, pc->pads_base,
-					    &rp1_pinctrl_pads_regmap_cfg);
-	if (IS_ERR(pads_regmap))
-		return dev_err_probe(dev, PTR_ERR(pads_regmap), "could not init PADS regmap\n");
+	/*
+	 * Workaround for the vagaries of PCIe on BCM2712
+	 *
+	 * If the link to RP1 is in L1, then the BRCMSTB RC will buffer many
+	 * outbound writes - and generate write responses for them, despite the
+	 * fact that the link is not yet active. This has the effect of compressing
+	 * multiple writes to GPIOs together, destroying any pacing that an application
+	 * may require in the 1-10us range.
+	 *
+	 * The RC Slot Control configuration register is special. It emits a
+	 * MsgD for every write to it, will stall further writes until the message
+	 * goes out on the wire. This can be (ab)used to force CPU stalls when the
+	 * link is inactive, at the cost of a small amount of downstream bandwidth
+	 * and some 200ns of added latency for each write.
+	 *
+	 * Several back-to-back configuration writes are necessary to "fill the pipe",
+	 * otherwise the outbound MAC can consume a pending MMIO write and reorder
+	 * it with respect to the config writes - undoing the intent.
+	 *
+	 * of_iomap() is used directly here as the address overlaps with the RC driver's
+	 * usage.
+	 */
+	rp1_node = of_find_node_by_name(NULL, "rp1");
+	if (!rp1_node)
+		dev_err(&pdev->dev, "failed to find RP1 DT node\n");
+	else if (pace_pin_updates &&
+		 of_device_is_compatible(rp1_node->parent,
+					 "brcm,bcm2712-pcie")) {
+		pc->dummy_base = of_iomap(rp1_node->parent, 0);
+		if (IS_ERR(pc->dummy_base)) {
+			dev_warn(
+				&pdev->dev,
+				"could not map bcm2712 root complex registers\n");
+			pc->dummy_base = NULL;
+		}
+	}
 
 	for (i = 0; i < RP1_NUM_BANKS; i++) {
 		const struct rp1_iobank_desc *bank = &rp1_iobanks[i];
@@ -1705,10 +1493,11 @@ static int rp1_pinctrl_probe(struct platform_device *pdev)
 				    j * sizeof(u32) * 2;
 			pin->inte = pc->gpio_base + bank->inte_offset;
 			pin->ints = pc->gpio_base + bank->ints_offset;
-			pin->rio  = pc->rio_base + bank->rio_offset;
-			pin->pad  = pc->pads_base + bank->pads_offset +
-				    j * sizeof(u32);
-			pin->dummy = pc->dummy_base ? pc->dummy_base + 0xc0 : NULL;
+			pin->rio = pc->rio_base + bank->rio_offset;
+			pin->pad = pc->pads_base + bank->pads_offset +
+				   j * sizeof(u32);
+			pin->dummy = pc->dummy_base ? pc->dummy_base + 0xc0 :
+						      NULL;
 		}
 
 		raw_spin_lock_init(&pc->irq_lock[i]);
