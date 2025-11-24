@@ -20,15 +20,17 @@
  * If the temperature is higher than a hysteresis temperature,
  *    a. if the trend is THERMAL_TREND_RAISING, use higher cooling
  *       state for this trip point
- *    b. if the trend is THERMAL_TREND_DROPPING, do nothing
- * If the temperature is lower than a hysteresis temperature,
+ *    b. if the trend is THERMAL_TREND_DROPPING, use a lower cooling state
+ *       for this trip point, but keep the cooling state above the applicable
+ *       minimum
+ * If the temperature is lower than a trip point,
  *    a. if the trend is THERMAL_TREND_RAISING, do nothing
- *    b. if the trend is THERMAL_TREND_DROPPING, use lower cooling
- *       state for this trip point, if the cooling state already
+ *    b. if the trend is THERMAL_TREND_DROPPING, use the minimum applicable
+ *       cooling state for this trip point, or if the cooling state already
  *       equals lower limit, deactivate the thermal instance
  */
 static unsigned long get_target_state(struct thermal_instance *instance,
-				enum thermal_trend trend, bool throttle)
+				      enum thermal_trend trend, bool throttle)
 {
 	struct thermal_cooling_device *cdev = instance->cdev;
 	unsigned long cur_state;
@@ -43,14 +45,27 @@ static unsigned long get_target_state(struct thermal_instance *instance,
 
 	if (!instance->initialized) {
 		if (throttle)
-			return clamp(cur_state + 1, instance->lower, instance->upper);
+			return clamp(cur_state + 1, instance->lower,
+				     instance->upper);
 
 		return THERMAL_NO_TARGET;
 	}
 
 	if (throttle) {
 		if (trend == THERMAL_TREND_RAISING)
-			return clamp(cur_state + 1, instance->lower, instance->upper);
+			return clamp(cur_state + 1, instance->lower,
+				     instance->upper);
+
+		/*
+		 * If the zone temperature is falling, the cooling level can
+		 * be reduced, but it should still be above the lower state of
+		 * the given thermal instance to pull the temperature further
+		 * down.
+		 */
+		if (trend == THERMAL_TREND_DROPPING)
+			return clamp(cur_state - 1,
+				     min(instance->lower + 1, instance->upper),
+				     instance->upper);
 	} else if (trend == THERMAL_TREND_DROPPING) {
 		if (cur_state <= instance->lower)
 			return THERMAL_NO_TARGET;
@@ -69,23 +84,22 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz,
 				     const struct thermal_trip_desc *td,
 				     int trip_threshold)
 {
+	bool throttle = tz->temperature >= trip_threshold;
 	const struct thermal_trip *trip = &td->trip;
 	enum thermal_trend trend = get_tz_trend(tz, trip);
 	int trip_id = thermal_zone_trip_id(tz, trip);
 	struct thermal_instance *instance;
-	bool throttle = false;
 	int hyst_temp;
 
-	if (tz->temperature >= trip_threshold) {
-		throttle = true;
+	if (throttle)
 		trace_thermal_zone_trip(tz, trip_id, trip->type);
-	}
 
 	hyst_temp = trip->temperature - trip->hysteresis;
 
 	dev_dbg(&tz->device,
 		"Trip%d[type=%d,temp=%d,hyst=%d]:trend=%d,throttle=%d\n",
-		trip_id, trip->type, trip->temperature, hyst_temp, trend, throttle);
+		trip_id, trip->type, trip->temperature, hyst_temp, trend,
+		throttle);
 
 	list_for_each_entry(instance, &td->thermal_instances, trip_node) {
 		int old_target;
@@ -97,8 +111,8 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz,
 		 * goes below the hysteresis temperature.
 		 */
 		if (tz->temperature >= trip->temperature ||
-		   (tz->temperature >= hyst_temp &&
-		   old_target == instance->upper)) {
+		    (tz->temperature >= hyst_temp &&
+		     old_target == instance->upper)) {
 			throttle = true;
 			trace_thermal_zone_trip(tz, trip_id, trip->type);
 		}
@@ -113,7 +127,8 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz,
 
 		instance->initialized = true;
 
-		scoped_guard(cooling_dev, instance->cdev) {
+		scoped_guard(cooling_dev, instance->cdev)
+		{
 			instance->cdev->updated = false; /* cdev needs update */
 		}
 	}
@@ -133,7 +148,8 @@ static void step_wise_manage(struct thermal_zone_device *tz)
 	 * is 'cooling down', it brings back the performance of the devices
 	 * by one step.
 	 */
-	for_each_trip_desc(tz, td) {
+	for_each_trip_desc(tz, td)
+	{
 		const struct thermal_trip *trip = &td->trip;
 
 		if (trip->temperature == THERMAL_TEMP_INVALID ||
@@ -144,14 +160,15 @@ static void step_wise_manage(struct thermal_zone_device *tz)
 		thermal_zone_trip_update(tz, td, td->threshold);
 	}
 
-	for_each_trip_desc(tz, td) {
+	for_each_trip_desc(tz, td)
+	{
 		list_for_each_entry(instance, &td->thermal_instances, trip_node)
 			thermal_cdev_update(instance->cdev);
 	}
 }
 
 static struct thermal_governor thermal_gov_step_wise = {
-	.name	= "step_wise",
-	.manage	= step_wise_manage,
+	.name = "step_wise",
+	.manage = step_wise_manage,
 };
 THERMAL_GOVERNOR_DECLARE(thermal_gov_step_wise);

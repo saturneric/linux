@@ -376,64 +376,7 @@ struct rp1_pll_core {
 struct rp1_pll {
 	struct clk_hw hw;
 	struct clk_divider div;
-	struct rp1_clockman *clockman;
-	const struct rp1_pll_data *data;
-	unsigned long cached_rate;
 };
-
-struct rp1_pll_ph {
-	struct clk_hw hw;
-	struct rp1_clockman *clockman;
-	const struct rp1_pll_ph_data *data;
-};
-
-struct rp1_clock {
-	struct clk_hw hw;
-	struct rp1_clockman *clockman;
-	const struct rp1_clock_data *data;
-	unsigned long cached_rate;
-};
-
-struct rp1_varsrc {
-	struct clk_hw hw;
-	struct rp1_clockman *clockman;
-	unsigned long rate;
-};
-
-struct rp1_clk_change {
-	struct clk_hw *hw;
-	unsigned long new_rate;
-};
-
-struct rp1_clk_change rp1_clk_chg_tree[3];
-
-static struct clk_hw *clk_xosc;
-static struct clk_hw *clk_audio;
-static struct clk_hw *clk_i2s;
-
-static void rp1_debugfs_regset(struct rp1_clockman *clockman, u32 base,
-			       const struct debugfs_reg32 *regs,
-			       size_t nregs, struct dentry *dentry)
-{
-	struct debugfs_regset32 *regset;
-
-	regset = devm_kzalloc(clockman->dev, sizeof(*regset), GFP_KERNEL);
-	if (!regset)
-		return;
-
-	regset->regs = regs;
-	regset->nregs = nregs;
-	regset->base = clockman->regs + base;
-
-	debugfs_create_regset32("regdump", 0444, dentry, regset);
-}
-
-static inline u32 set_register_field(u32 reg, u32 val, u32 mask, u32 shift)
-{
-	reg &= ~mask;
-	reg |= (val << shift) & mask;
-	return reg;
-}
 
 static inline
 void clockman_write(struct rp1_clockman *clockman, u32 reg, u32 val)
@@ -600,7 +543,6 @@ static int rp1_pll_core_set_rate(struct clk_hw *hw,
 	struct rp1_pll_core *pll_core = container_of(hw, struct rp1_pll_core, hw);
 	struct rp1_clockman *clockman = pll_core->clockman;
 	const struct rp1_pll_core_data *data = pll_core->data;
-	unsigned long calc_rate;
 	u32 fbdiv_int, fbdiv_frac;
 
 	// todo: is this needed??
@@ -612,8 +554,8 @@ static int rp1_pll_core_set_rate(struct clk_hw *hw,
 	clockman_write(clockman, data->fbdiv_frac_reg, 0);
 	spin_unlock(&clockman->regs_lock);
 
-	calc_rate = get_pll_core_divider(hw, rate, parent_rate,
-					 &fbdiv_int, &fbdiv_frac);
+	get_pll_core_divider(hw, rate, parent_rate,
+			     &fbdiv_int, &fbdiv_frac);
 
 	spin_lock(&clockman->regs_lock);
 	clockman_write(clockman, data->pwr_reg, fbdiv_frac ? 0 : PLL_PWR_DSMPD);
@@ -623,8 +565,6 @@ static int rp1_pll_core_set_rate(struct clk_hw *hw,
 
 	/* Check that reference frequency is no greater than VCO / 16. */
 	BUG_ON(parent_rate > (rate / 16));
-
-	pll_core->cached_rate = calc_rate;
 
 	spin_lock(&clockman->regs_lock);
 	/* Don't need to divide ref unless parent_rate > (output freq / 16) */
@@ -653,38 +593,14 @@ static unsigned long rp1_pll_core_recalc_rate(struct clk_hw *hw,
 	return calc_rate;
 }
 
-static long rp1_pll_core_round_rate(struct clk_hw *hw, unsigned long rate,
-				    unsigned long *parent_rate)
+static int rp1_pll_core_determine_rate(struct clk_hw *hw,
+				       struct clk_rate_request *req)
 {
 	u32 fbdiv_int, fbdiv_frac;
 	long calc_rate;
 
-	calc_rate = get_pll_core_divider(hw, rate, *parent_rate,
-					 &fbdiv_int, &fbdiv_frac);
-	return calc_rate;
-}
-
-static void rp1_pll_core_debug_init(struct clk_hw *hw, struct dentry *dentry)
-{
-	struct rp1_pll_core *pll_core = container_of(hw, struct rp1_pll_core, hw);
-	struct rp1_clockman *clockman = pll_core->clockman;
-	const struct rp1_pll_core_data *data = pll_core->data;
-	struct debugfs_reg32 *regs;
-
-	regs = devm_kcalloc(clockman->dev, 4, sizeof(*regs), GFP_KERNEL);
-	if (!regs)
-		return;
-
-	regs[0].name = "cs";
-	regs[0].offset = data->cs_reg;
-	regs[1].name = "pwr";
-	regs[1].offset = data->pwr_reg;
-	regs[2].name = "fbdiv_int";
-	regs[2].offset = data->fbdiv_int_reg;
-	regs[3].name = "fbdiv_frac";
-	regs[3].offset = data->fbdiv_frac_reg;
-
-	rp1_debugfs_regset(clockman, 0, regs, 4, dentry);
+	return get_pll_core_divider(hw, rate, *parent_rate,
+				    &fbdiv_int, &fbdiv_frac);
 }
 
 static void get_pll_prim_dividers(unsigned long rate, unsigned long parent_rate,
@@ -764,18 +680,16 @@ static unsigned long rp1_pll_recalc_rate(struct clk_hw *hw,
 	return DIV_ROUND_CLOSEST(parent_rate, prim_div1 * prim_div2);
 }
 
-static long rp1_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate)
+static int rp1_pll_determine_rate(struct clk_hw *hw,
+				  struct clk_rate_request *req)
 {
-	const struct rp1_clk_change *chg = &rp1_clk_chg_tree[1];
 	u32 div1, div2;
-
-	if (chg->hw == hw && chg->new_rate == rate)
-		*parent_rate = chg[1].new_rate;
 
 	get_pll_prim_dividers(rate, *parent_rate, &div1, &div2);
 
-	return DIV_ROUND_CLOSEST(*parent_rate, div1 * div2);
+	req->rate = DIV_ROUND_CLOSEST(req->best_parent_rate, div1 * div2);
+
+	return 0;
 }
 
 static void rp1_pll_debug_init(struct clk_hw *hw,
@@ -865,13 +779,15 @@ static unsigned long rp1_pll_ph_recalc_rate(struct clk_hw *hw,
 	return parent_rate / data->fixed_divider;
 }
 
-static long rp1_pll_ph_round_rate(struct clk_hw *hw, unsigned long rate,
-				  unsigned long *parent_rate)
+static int rp1_pll_ph_determine_rate(struct clk_hw *hw,
+				     struct clk_rate_request *req)
 {
 	struct rp1_pll_ph *pll_ph = container_of(hw, struct rp1_pll_ph, hw);
 	const struct rp1_pll_ph_data *data = pll_ph->data;
 
-	return *parent_rate / data->fixed_divider;
+	req->rate = req->best_parent_rate / data->fixed_divider;
+
+	return 0;
 }
 
 static void rp1_pll_ph_debug_init(struct clk_hw *hw,
@@ -970,11 +886,12 @@ static unsigned long rp1_pll_divider_recalc_rate(struct clk_hw *hw,
 	return clk_divider_ops.recalc_rate(hw, parent_rate);
 }
 
-static long rp1_pll_divider_round_rate(struct clk_hw *hw,
-				       unsigned long rate,
-				       unsigned long *parent_rate)
+static int rp1_pll_divider_determine_rate(struct clk_hw *hw,
+					  struct clk_rate_request *req)
 {
-	return clk_divider_ops.round_rate(hw, rate, parent_rate);
+	req->rate = clk_divider_ops.determine_rate(hw, req);
+
+	return 0;
 }
 
 static void rp1_pll_divider_debug_init(struct clk_hw *hw, struct dentry *dentry)
@@ -1211,59 +1128,6 @@ static int rp1_clock_set_rate(struct clk_hw *hw, unsigned long rate,
 	return rp1_clock_set_rate_and_parent(hw, rate, parent_rate, 0xff);
 }
 
-static unsigned long calc_core_pll_rate(struct clk_hw *pll_hw,
-					unsigned long target_rate,
-					int *pdiv_prim, int *pdiv_clk)
-{
-	static const int prim_divs[] = {
-		2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 15, 16,
-		18, 20, 21, 24, 25, 28, 30, 35, 36, 42, 49,
-	};
-	const unsigned long xosc_rate = clk_hw_get_rate(clk_xosc);
-	const unsigned long core_max = 2400000000;
-	const unsigned long core_min = xosc_rate * 16;
-	unsigned long best_rate = core_max + 1;
-	int best_div_prim = 1, best_div_clk = 1;
-	unsigned long core_rate = 0;
-	int div_int, div_frac;
-	u64 div;
-	int i;
-
-	/* Given the target rate, choose a set of divisors/multipliers */
-	for (i = 0; i < ARRAY_SIZE(prim_divs); i++) {
-		int div_prim = prim_divs[i];
-		int div_clk;
-
-		for (div_clk = 1; div_clk <= 256; div_clk++) {
-			core_rate = target_rate * div_clk * div_prim;
-			if (core_rate >= core_min) {
-				if (core_rate < best_rate) {
-					best_rate = core_rate;
-					best_div_prim = div_prim;
-					best_div_clk = div_clk;
-				}
-				break;
-			}
-		}
-	}
-
-	if (best_rate < core_max) {
-		div = ((best_rate << 24) + xosc_rate / 2) / xosc_rate;
-		div_int = div >> 24;
-		div_frac = div % (1 << 24);
-		core_rate = (xosc_rate * ((div_int << 24) + div_frac) + (1 << 23)) >> 24;
-	} else {
-		core_rate = 0;
-	}
-
-	if (pdiv_prim)
-		*pdiv_prim = best_div_prim;
-	if (pdiv_clk)
-		*pdiv_clk = best_div_clk;
-
-	return core_rate;
-}
-
 static void rp1_clock_choose_div_and_prate(struct clk_hw *hw,
 					   int parent_idx,
 					   unsigned long rate,
@@ -1272,45 +1136,14 @@ static void rp1_clock_choose_div_and_prate(struct clk_hw *hw,
 {
 	struct rp1_clock *clock = container_of(hw, struct rp1_clock, hw);
 	const struct rp1_clock_data *data = clock->data;
+	struct clk_hw *clk_audio_hw = &clk_audio->hw;
+	struct clk_hw *clk_i2s_hw = &clk_i2s->hw;
 	struct clk_hw *parent;
 	u32 div;
 	u64 tmp;
 	int i;
 
 	parent = clk_hw_get_parent_by_index(hw, parent_idx);
-
-	for (i = 0; i < ARRAY_SIZE(rp1_clk_chg_tree); i++) {
-		const struct rp1_clk_change *chg = &rp1_clk_chg_tree[i];
-
-		if (chg->hw == hw && chg->new_rate == rate) {
-			if (i == 2)
-				*prate = clk_hw_get_rate(clk_xosc);
-			else if (parent == rp1_clk_chg_tree[i + 1].hw)
-				*prate = rp1_clk_chg_tree[i + 1].new_rate;
-			else
-				continue;
-			*calc_rate = chg->new_rate;
-			return;
-		}
-	}
-
-	if (hw == clk_i2s && parent == clk_audio) {
-		unsigned long core_rate, audio_rate, i2s_rate;
-		int div_prim, div_clk;
-
-		core_rate = calc_core_pll_rate(parent, rate, &div_prim, &div_clk);
-		audio_rate = DIV_NEAREST(core_rate, div_prim);
-		i2s_rate = DIV_NEAREST(audio_rate, div_clk);
-		rp1_clk_chg_tree[2].hw = clk_hw_get_parent(parent);
-		rp1_clk_chg_tree[2].new_rate = core_rate;
-		rp1_clk_chg_tree[1].hw = clk_audio;
-		rp1_clk_chg_tree[1].new_rate = audio_rate;
-		rp1_clk_chg_tree[0].hw = clk_i2s;
-		rp1_clk_chg_tree[0].new_rate = i2s_rate;
-		*prate = audio_rate;
-		*calc_rate = i2s_rate;
-		return;
-	}
 
 	*prate = clk_hw_get_rate(parent);
 	div = rp1_clock_choose_div(rate, *prate, data);
@@ -1397,59 +1230,6 @@ static int rp1_clock_determine_rate(struct clk_hw *hw,
 	return 0;
 }
 
-static void rp1_clk_debug_init(struct clk_hw *hw, struct dentry *dentry)
-{
-	struct rp1_clock *clock = container_of(hw, struct rp1_clock, hw);
-	struct rp1_clockman *clockman = clock->clockman;
-	const struct rp1_clock_data *data = clock->data;
-	struct debugfs_reg32 *regs;
-	int i;
-
-	regs = devm_kcalloc(clockman->dev, 4, sizeof(*regs), GFP_KERNEL);
-	if (!regs)
-		return;
-
-	i = 0;
-	regs[i].name = "ctrl";
-	regs[i++].offset = data->ctrl_reg;
-	regs[i].name = "div_int";
-	regs[i++].offset = data->div_int_reg;
-	regs[i].name = "div_frac";
-	regs[i++].offset = data->div_frac_reg;
-	regs[i].name = "sel";
-	regs[i++].offset = data->sel_reg;
-
-	rp1_debugfs_regset(clockman, 0, regs, i, dentry);
-}
-
-static int rp1_varsrc_set_rate(struct clk_hw *hw,
-			       unsigned long rate, unsigned long parent_rate)
-{
-	struct rp1_varsrc *varsrc = container_of(hw, struct rp1_varsrc, hw);
-
-	/*
-	 * "varsrc" exists purely to let clock dividers know the frequency
-	 * of an externally-managed clock source (such as MIPI DSI byte-clock)
-	 * which may change at run-time as a side-effect of some other driver.
-	 */
-	varsrc->rate = rate;
-	return 0;
-}
-
-static unsigned long rp1_varsrc_recalc_rate(struct clk_hw *hw,
-					    unsigned long parent_rate)
-{
-	struct rp1_varsrc *varsrc = container_of(hw, struct rp1_varsrc, hw);
-
-	return varsrc->rate;
-}
-
-static long rp1_varsrc_round_rate(struct clk_hw *hw, unsigned long rate,
-				  unsigned long *parent_rate)
-{
-	return rate;
-}
-
 static const struct clk_ops rp1_pll_core_ops = {
 	.is_prepared = rp1_pll_core_is_on,
 	.prepare = rp1_pll_core_on,
@@ -1457,14 +1237,12 @@ static const struct clk_ops rp1_pll_core_ops = {
 	.set_rate = rp1_pll_core_set_rate,
 	.recalc_rate = rp1_pll_core_recalc_rate,
 	.round_rate = rp1_pll_core_round_rate,
-	.debug_init = rp1_pll_core_debug_init,
 };
 
 static const struct clk_ops rp1_pll_ops = {
 	.set_rate = rp1_pll_set_rate,
 	.recalc_rate = rp1_pll_recalc_rate,
 	.round_rate = rp1_pll_round_rate,
-	.debug_init = rp1_pll_debug_init,
 };
 
 static const struct clk_ops rp1_pll_ph_ops = {
@@ -1474,7 +1252,6 @@ static const struct clk_ops rp1_pll_ph_ops = {
 	.set_rate = rp1_pll_ph_set_rate,
 	.recalc_rate = rp1_pll_ph_recalc_rate,
 	.round_rate = rp1_pll_ph_round_rate,
-	.debug_init = rp1_pll_ph_debug_init,
 };
 
 static const struct clk_ops rp1_pll_divider_ops = {
@@ -1484,7 +1261,6 @@ static const struct clk_ops rp1_pll_divider_ops = {
 	.set_rate = rp1_pll_divider_set_rate,
 	.recalc_rate = rp1_pll_divider_recalc_rate,
 	.round_rate = rp1_pll_divider_round_rate,
-	.debug_init = rp1_pll_divider_debug_init,
 };
 
 static const struct clk_ops rp1_clk_ops = {
@@ -1499,46 +1275,6 @@ static const struct clk_ops rp1_clk_ops = {
 	.determine_rate = rp1_clock_determine_rate,
 	.debug_init = rp1_clk_debug_init,
 };
-
-static const struct clk_ops rp1_varsrc_ops = {
-	.set_rate = rp1_varsrc_set_rate,
-	.recalc_rate = rp1_varsrc_recalc_rate,
-	.round_rate = rp1_varsrc_round_rate,
-};
-
-static struct clk_hw *rp1_register_pll_core(struct rp1_clockman *clockman,
-					    const void *data)
-{
-	const struct rp1_pll_core_data *pll_core_data = data;
-	struct rp1_pll_core *pll_core;
-	struct clk_init_data init;
-	int ret;
-
-	memset(&init, 0, sizeof(init));
-
-	/* All of the PLL cores derive from the external oscillator. */
-	init.parent_names = &ref_clock;
-	init.num_parents = 1;
-	init.name = pll_core_data->name;
-	init.ops = &rp1_pll_core_ops;
-	init.flags = pll_core_data->flags | CLK_IS_CRITICAL;
-
-	pll_core = kzalloc(sizeof(*pll_core), GFP_KERNEL);
-	if (!pll_core)
-		return NULL;
-
-	pll_core->clockman = clockman;
-	pll_core->data = pll_core_data;
-	pll_core->hw.init = &init;
-
-	ret = devm_clk_hw_register(clockman->dev, &pll_core->hw);
-	if (ret) {
-		kfree(pll_core);
-		return NULL;
-	}
-
-	return &pll_core->hw;
-}
 
 static struct clk_hw *rp1_register_pll(struct rp1_clockman *clockman,
 				       const void *data)
@@ -1736,681 +1472,253 @@ struct rp1_clk_desc {
 					  {__VA_ARGS__})
 
 #define REGISTER_CLK(...)	_REGISTER(&rp1_register_clock,		\
-					  &(struct rp1_clock_data)	\
-					  {__VA_ARGS__})
+					  __VA_ARGS__)
 
-#define REGISTER_VARSRC(n)	_REGISTER(&rp1_register_varsrc,	&(const char *){n})
+static struct rp1_clk_desc pll_sys_core_desc = REGISTER_PLL(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"pll_sys_core",
+		(const struct clk_parent_data[]) { { .index = 0 } },
+		&rp1_pll_core_ops,
+		CLK_IS_CRITICAL
+	),
+	CLK_DATA(rp1_pll_core_data,
+		 .cs_reg = PLL_SYS_CS,
+		 .pwr_reg = PLL_SYS_PWR,
+		 .fbdiv_int_reg = PLL_SYS_FBDIV_INT,
+		 .fbdiv_frac_reg = PLL_SYS_FBDIV_FRAC,
+	)
+);
 
-static const struct rp1_clk_desc clk_desc_array[] = {
-	[RP1_PLL_SYS_CORE] = REGISTER_PLL_CORE(
-				.name = "pll_sys_core",
-				.cs_reg = PLL_SYS_CS,
-				.pwr_reg = PLL_SYS_PWR,
-				.fbdiv_int_reg = PLL_SYS_FBDIV_INT,
-				.fbdiv_frac_reg = PLL_SYS_FBDIV_FRAC,
-				),
+static struct rp1_clk_desc pll_audio_core_desc = REGISTER_PLL(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"pll_audio_core",
+		(const struct clk_parent_data[]) { { .index = 0 } },
+		&rp1_pll_core_ops,
+		CLK_IS_CRITICAL
+	),
+	CLK_DATA(rp1_pll_core_data,
+		 .cs_reg = PLL_AUDIO_CS,
+		 .pwr_reg = PLL_AUDIO_PWR,
+		 .fbdiv_int_reg = PLL_AUDIO_FBDIV_INT,
+		 .fbdiv_frac_reg = PLL_AUDIO_FBDIV_FRAC,
+	)
+);
 
-	[RP1_PLL_AUDIO_CORE] = REGISTER_PLL_CORE(
-				.name = "pll_audio_core",
-				.cs_reg = PLL_AUDIO_CS,
-				.pwr_reg = PLL_AUDIO_PWR,
-				.fbdiv_int_reg = PLL_AUDIO_FBDIV_INT,
-				.fbdiv_frac_reg = PLL_AUDIO_FBDIV_FRAC,
-				),
+static struct rp1_clk_desc pll_video_core_desc = REGISTER_PLL(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"pll_video_core",
+		(const struct clk_parent_data[]) { { .index = 0 } },
+		&rp1_pll_core_ops,
+		CLK_IS_CRITICAL
+	),
+	CLK_DATA(rp1_pll_core_data,
+		 .cs_reg = PLL_VIDEO_CS,
+		 .pwr_reg = PLL_VIDEO_PWR,
+		 .fbdiv_int_reg = PLL_VIDEO_FBDIV_INT,
+		 .fbdiv_frac_reg = PLL_VIDEO_FBDIV_FRAC,
+	)
+);
 
-	[RP1_PLL_VIDEO_CORE] = REGISTER_PLL_CORE(
-				.name = "pll_video_core",
-				.cs_reg = PLL_VIDEO_CS,
-				.pwr_reg = PLL_VIDEO_PWR,
-				.fbdiv_int_reg = PLL_VIDEO_FBDIV_INT,
-				.fbdiv_frac_reg = PLL_VIDEO_FBDIV_FRAC,
-				),
+static struct rp1_clk_desc pll_sys_desc = REGISTER_PLL(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"pll_sys",
+		(const struct clk_parent_data[]) {
+			{ .hw = &pll_sys_core_desc.hw }
+		},
+		&rp1_pll_ops,
+		0
+	),
+	CLK_DATA(rp1_pll_data,
+		 .ctrl_reg = PLL_SYS_PRIM,
+		 .fc0_src = FC_NUM(0, 2),
+	)
+);
 
-	[RP1_PLL_SYS] = REGISTER_PLL(
-				.name = "pll_sys",
-				.source_pll = "pll_sys_core",
-				.ctrl_reg = PLL_SYS_PRIM,
-				.fc0_src = FC_NUM(0, 2),
-				),
+static struct rp1_clk_desc pll_sys_sec_desc = REGISTER_PLL_DIV(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"pll_sys_sec",
+		(const struct clk_parent_data[]) {
+			{ .hw = &pll_sys_core_desc.hw }
+		},
+		&rp1_pll_divider_ops,
+		0
+	),
+	CLK_DATA(rp1_pll_data,
+		 .ctrl_reg = PLL_SYS_SEC,
+		 .fc0_src = FC_NUM(2, 2),
+	)
+);
 
-	[RP1_PLL_AUDIO] = REGISTER_PLL(
-				.name = "pll_audio",
-				.source_pll = "pll_audio_core",
-				.ctrl_reg = PLL_AUDIO_PRIM,
-				.fc0_src = FC_NUM(4, 2),
-				.flags = CLK_SET_RATE_PARENT,
-				),
+static struct rp1_clk_desc clk_eth_tsu_desc = REGISTER_CLK(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"clk_eth_tsu",
+		(const struct clk_parent_data[]) { { .index = 0 } },
+		&rp1_clk_ops,
+		0
+	),
+	CLK_DATA(rp1_clock_data,
+		 .num_std_parents = 0,
+		 .num_aux_parents = 1,
+		 .ctrl_reg = CLK_ETH_TSU_CTRL,
+		 .div_int_reg = CLK_ETH_TSU_DIV_INT,
+		 .sel_reg = CLK_ETH_TSU_SEL,
+		 .div_int_max = DIV_INT_8BIT_MAX,
+		 .max_freq = 50 * HZ_PER_MHZ,
+		 .fc0_src = FC_NUM(5, 7),
+	)
+);
 
-	[RP1_PLL_VIDEO] = REGISTER_PLL(
-				.name = "pll_video",
-				.source_pll = "pll_video_core",
-				.ctrl_reg = PLL_VIDEO_PRIM,
-				.fc0_src = FC_NUM(3, 2),
-				),
+static const struct clk_parent_data clk_eth_parents[] = {
+	{ .hw = &pll_sys_sec_desc.div.hw },
+	{ .hw = &pll_sys_desc.hw },
+};
 
-	[RP1_PLL_SYS_PRI_PH] = REGISTER_PLL_PH(
-				.name = "pll_sys_pri_ph",
-				.source_pll = "pll_sys",
-				.ph_reg = PLL_SYS_PRIM,
-				.fixed_divider = 2,
-				.phase = RP1_PLL_PHASE_0,
-				.fc0_src = FC_NUM(1, 2),
-				),
+static struct rp1_clk_desc clk_eth_desc = REGISTER_CLK(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"clk_eth",
+		clk_eth_parents,
+		&rp1_clk_ops,
+		0
+	),
+	CLK_DATA(rp1_clock_data,
+		 .num_std_parents = 0,
+		 .num_aux_parents = 2,
+		 .ctrl_reg = CLK_ETH_CTRL,
+		 .div_int_reg = CLK_ETH_DIV_INT,
+		 .sel_reg = CLK_ETH_SEL,
+		 .div_int_max = DIV_INT_8BIT_MAX,
+		 .max_freq = 125 * HZ_PER_MHZ,
+		 .fc0_src = FC_NUM(4, 6),
+	)
+);
 
-	[RP1_PLL_AUDIO_PRI_PH] = REGISTER_PLL_PH(
-				.name = "pll_audio_pri_ph",
-				.source_pll = "pll_audio",
-				.ph_reg = PLL_AUDIO_PRIM,
-				.fixed_divider = 2,
-				.phase = RP1_PLL_PHASE_0,
-				.fc0_src = FC_NUM(5, 1),
-				),
+static const struct clk_parent_data clk_sys_parents[] = {
+	{ .index = 0 },
+	{ .index = -1 },
+	{ .hw = &pll_sys_desc.hw },
+};
 
-	[RP1_PLL_VIDEO_PRI_PH] = REGISTER_PLL_PH(
-				.name = "pll_video_pri_ph",
-				.source_pll = "pll_video",
-				.ph_reg = PLL_VIDEO_PRIM,
-				.fixed_divider = 2,
-				.phase = RP1_PLL_PHASE_0,
-				.fc0_src = FC_NUM(4, 3),
-				),
+static struct rp1_clk_desc clk_sys_desc = REGISTER_CLK(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"clk_sys",
+		clk_sys_parents,
+		&rp1_clk_ops,
+		CLK_IS_CRITICAL
+	),
+	CLK_DATA(rp1_clock_data,
+		 .num_std_parents = 3,
+		 .num_aux_parents = 0,
+		 .ctrl_reg = CLK_SYS_CTRL,
+		 .div_int_reg = CLK_SYS_DIV_INT,
+		 .sel_reg = CLK_SYS_SEL,
+		 .div_int_max = DIV_INT_24BIT_MAX,
+		 .max_freq = 200 * HZ_PER_MHZ,
+		 .fc0_src = FC_NUM(0, 4),
+		 .clk_src_mask = 0x3,
+	)
+);
 
-	[RP1_PLL_SYS_SEC] = REGISTER_PLL_DIV(
-				.name = "pll_sys_sec",
-				.source_pll = "pll_sys_core",
-				.ctrl_reg = PLL_SYS_SEC,
-				.fc0_src = FC_NUM(2, 2),
-				),
+static struct rp1_clk_desc pll_sys_pri_ph_desc = REGISTER_PLL(
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(
+		"pll_sys_pri_ph",
+		(const struct clk_parent_data[]) {
+			{ .hw = &pll_sys_desc.hw }
+		},
+		&rp1_pll_ph_ops,
+		0
+	),
+	CLK_DATA(rp1_pll_ph_data,
+		 .ph_reg = PLL_SYS_PRIM,
+		 .fixed_divider = 2,
+		 .phase = RP1_PLL_PHASE_0,
+		 .fc0_src = FC_NUM(1, 2),
+	)
+);
 
-	[RP1_PLL_AUDIO_SEC] = REGISTER_PLL_DIV(
-				.name = "pll_audio_sec",
-				.source_pll = "pll_audio_core",
-				.ctrl_reg = PLL_AUDIO_SEC,
-				.fc0_src = FC_NUM(6, 2),
-				),
+static struct rp1_clk_desc *const clk_desc_array[] = {
+	[RP1_PLL_SYS_CORE] = &pll_sys_core_desc,
+	[RP1_PLL_AUDIO_CORE] = &pll_audio_core_desc,
+	[RP1_PLL_VIDEO_CORE] = &pll_video_core_desc,
+	[RP1_PLL_SYS] = &pll_sys_desc,
+	[RP1_CLK_ETH_TSU] = &clk_eth_tsu_desc,
+	[RP1_CLK_ETH] = &clk_eth_desc,
+	[RP1_CLK_SYS] = &clk_sys_desc,
+	[RP1_PLL_SYS_PRI_PH] = &pll_sys_pri_ph_desc,
+	[RP1_PLL_SYS_SEC] = &pll_sys_sec_desc,
+};
 
-	[RP1_PLL_VIDEO_SEC] = REGISTER_PLL_DIV(
-				.name = "pll_video_sec",
-				.source_pll = "pll_video_core",
-				.ctrl_reg = PLL_VIDEO_SEC,
-				.fc0_src = FC_NUM(5, 3),
-				),
+static const struct regmap_range rp1_reg_ranges[] = {
+	regmap_reg_range(PLL_SYS_CS, PLL_SYS_SEC),
+	regmap_reg_range(PLL_AUDIO_CS, PLL_AUDIO_TERN),
+	regmap_reg_range(PLL_VIDEO_CS, PLL_VIDEO_SEC),
+	regmap_reg_range(GPCLK_OE_CTRL, GPCLK_OE_CTRL),
+	regmap_reg_range(CLK_SYS_CTRL, CLK_SYS_DIV_INT),
+	regmap_reg_range(CLK_SYS_SEL, CLK_SYS_SEL),
+	regmap_reg_range(CLK_SLOW_SYS_CTRL, CLK_SLOW_SYS_DIV_INT),
+	regmap_reg_range(CLK_SLOW_SYS_SEL, CLK_SLOW_SYS_SEL),
+	regmap_reg_range(CLK_DMA_CTRL, CLK_DMA_DIV_INT),
+	regmap_reg_range(CLK_DMA_SEL, CLK_DMA_SEL),
+	regmap_reg_range(CLK_UART_CTRL, CLK_UART_DIV_INT),
+	regmap_reg_range(CLK_UART_SEL, CLK_UART_SEL),
+	regmap_reg_range(CLK_ETH_CTRL, CLK_ETH_DIV_INT),
+	regmap_reg_range(CLK_ETH_SEL, CLK_ETH_SEL),
+	regmap_reg_range(CLK_PWM0_CTRL, CLK_PWM0_SEL),
+	regmap_reg_range(CLK_PWM1_CTRL, CLK_PWM1_SEL),
+	regmap_reg_range(CLK_AUDIO_IN_CTRL, CLK_AUDIO_IN_DIV_INT),
+	regmap_reg_range(CLK_AUDIO_IN_SEL, CLK_AUDIO_IN_SEL),
+	regmap_reg_range(CLK_AUDIO_OUT_CTRL, CLK_AUDIO_OUT_DIV_INT),
+	regmap_reg_range(CLK_AUDIO_OUT_SEL, CLK_AUDIO_OUT_SEL),
+	regmap_reg_range(CLK_I2S_CTRL, CLK_I2S_DIV_INT),
+	regmap_reg_range(CLK_I2S_SEL, CLK_I2S_SEL),
+	regmap_reg_range(CLK_MIPI0_CFG_CTRL, CLK_MIPI0_CFG_DIV_INT),
+	regmap_reg_range(CLK_MIPI0_CFG_SEL, CLK_MIPI0_CFG_SEL),
+	regmap_reg_range(CLK_MIPI1_CFG_CTRL, CLK_MIPI1_CFG_DIV_INT),
+	regmap_reg_range(CLK_MIPI1_CFG_SEL, CLK_MIPI1_CFG_SEL),
+	regmap_reg_range(CLK_PCIE_AUX_CTRL, CLK_PCIE_AUX_DIV_INT),
+	regmap_reg_range(CLK_PCIE_AUX_SEL, CLK_PCIE_AUX_SEL),
+	regmap_reg_range(CLK_USBH0_MICROFRAME_CTRL, CLK_USBH0_MICROFRAME_DIV_INT),
+	regmap_reg_range(CLK_USBH0_MICROFRAME_SEL, CLK_USBH0_MICROFRAME_SEL),
+	regmap_reg_range(CLK_USBH1_MICROFRAME_CTRL, CLK_USBH1_MICROFRAME_DIV_INT),
+	regmap_reg_range(CLK_USBH1_MICROFRAME_SEL, CLK_USBH1_MICROFRAME_SEL),
+	regmap_reg_range(CLK_USBH0_SUSPEND_CTRL, CLK_USBH0_SUSPEND_DIV_INT),
+	regmap_reg_range(CLK_USBH0_SUSPEND_SEL, CLK_USBH0_SUSPEND_SEL),
+	regmap_reg_range(CLK_USBH1_SUSPEND_CTRL, CLK_USBH1_SUSPEND_DIV_INT),
+	regmap_reg_range(CLK_USBH1_SUSPEND_SEL, CLK_USBH1_SUSPEND_SEL),
+	regmap_reg_range(CLK_ETH_TSU_CTRL, CLK_ETH_TSU_DIV_INT),
+	regmap_reg_range(CLK_ETH_TSU_SEL, CLK_ETH_TSU_SEL),
+	regmap_reg_range(CLK_ADC_CTRL, CLK_ADC_DIV_INT),
+	regmap_reg_range(CLK_ADC_SEL, CLK_ADC_SEL),
+	regmap_reg_range(CLK_SDIO_TIMER_CTRL, CLK_SDIO_TIMER_DIV_INT),
+	regmap_reg_range(CLK_SDIO_TIMER_SEL, CLK_SDIO_TIMER_SEL),
+	regmap_reg_range(CLK_SDIO_ALT_SRC_CTRL, CLK_SDIO_ALT_SRC_DIV_INT),
+	regmap_reg_range(CLK_SDIO_ALT_SRC_SEL, CLK_SDIO_ALT_SRC_SEL),
+	regmap_reg_range(CLK_GP0_CTRL, CLK_GP0_SEL),
+	regmap_reg_range(CLK_GP1_CTRL, CLK_GP1_SEL),
+	regmap_reg_range(CLK_GP2_CTRL, CLK_GP2_SEL),
+	regmap_reg_range(CLK_GP3_CTRL, CLK_GP3_SEL),
+	regmap_reg_range(CLK_GP4_CTRL, CLK_GP4_SEL),
+	regmap_reg_range(CLK_GP5_CTRL, CLK_GP5_SEL),
+	regmap_reg_range(CLK_SYS_RESUS_CTRL, CLK_SYS_RESUS_CTRL),
+	regmap_reg_range(CLK_SLOW_SYS_RESUS_CTRL, CLK_SLOW_SYS_RESUS_CTRL),
+	regmap_reg_range(FC0_REF_KHZ, FC0_RESULT),
+	regmap_reg_range(VIDEO_CLK_VEC_CTRL, VIDEO_CLK_VEC_DIV_INT),
+	regmap_reg_range(VIDEO_CLK_VEC_SEL, VIDEO_CLK_DPI_DIV_INT),
+	regmap_reg_range(VIDEO_CLK_DPI_SEL, VIDEO_CLK_MIPI1_DPI_SEL),
+};
 
-	[RP1_PLL_AUDIO_TERN] = REGISTER_PLL_DIV(
-				.name = "pll_audio_tern",
-				.source_pll = "pll_audio_core",
-				.ctrl_reg = PLL_AUDIO_TERN,
-				.fc0_src = FC_NUM(6, 2),
-				),
+static const struct regmap_access_table rp1_reg_table = {
+	.yes_ranges = rp1_reg_ranges,
+	.n_yes_ranges = ARRAY_SIZE(rp1_reg_ranges),
+};
 
-	[RP1_CLK_SYS] = REGISTER_CLK(
-				.name = "clk_sys",
-				.parents = {"xosc", "-", "pll_sys"},
-				.num_std_parents = 3,
-				.num_aux_parents = 0,
-				.ctrl_reg = CLK_SYS_CTRL,
-				.div_int_reg = CLK_SYS_DIV_INT,
-				.sel_reg = CLK_SYS_SEL,
-				.div_int_max = DIV_INT_24BIT_MAX,
-				.max_freq = 200 * MHz,
-				.fc0_src = FC_NUM(0, 4),
-				.clk_src_mask = 0x3,
-				/* Always enabled in hardware */
-				.flags = CLK_IS_CRITICAL,
-				),
-
-	[RP1_CLK_SLOW_SYS] = REGISTER_CLK(
-				.name = "clk_slow_sys",
-				.parents = {"xosc"},
-				.num_std_parents = 1,
-				.num_aux_parents = 0,
-				.ctrl_reg = CLK_SLOW_SYS_CTRL,
-				.div_int_reg = CLK_SLOW_SYS_DIV_INT,
-				.sel_reg = CLK_SLOW_SYS_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 50 * MHz,
-				.fc0_src = FC_NUM(1, 4),
-				.clk_src_mask = 0x1,
-				/* Always enabled in hardware */
-				.flags = CLK_IS_CRITICAL,
-				),
-
-	[RP1_CLK_DMA] = REGISTER_CLK(
-				.name = "clk_dma",
-				.parents = {"pll_sys_pri_ph",
-					    "pll_video",
-					    "xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 9,
-				.ctrl_reg = CLK_DMA_CTRL,
-				.div_int_reg = CLK_DMA_DIV_INT,
-				.sel_reg = CLK_DMA_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(2, 2),
-				),
-
-	[RP1_CLK_UART] = REGISTER_CLK(
-				.name = "clk_uart",
-				.parents = {"pll_sys_pri_ph",
-					    "pll_video",
-					    "xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 9,
-				.ctrl_reg = CLK_UART_CTRL,
-				.div_int_reg = CLK_UART_DIV_INT,
-				.sel_reg = CLK_UART_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(6, 7),
-				),
-
-	[RP1_CLK_ETH] = REGISTER_CLK(
-				.name = "clk_eth",
-				.parents = {"pll_sys_sec",
-					    "pll_sys",
-					    "pll_video_sec",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 9,
-				.ctrl_reg = CLK_ETH_CTRL,
-				.div_int_reg = CLK_ETH_DIV_INT,
-				.sel_reg = CLK_ETH_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 125 * MHz,
-				.fc0_src = FC_NUM(4, 6),
-				),
-
-	[RP1_CLK_PWM0] = REGISTER_CLK(
-				.name = "clk_pwm0",
-				.parents = {"", // "pll_audio_pri_ph",
-					    "pll_video_sec",
-					    "xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 9,
-				.ctrl_reg = CLK_PWM0_CTRL,
-				.div_int_reg = CLK_PWM0_DIV_INT,
-				.div_frac_reg = CLK_PWM0_DIV_FRAC,
-				.sel_reg = CLK_PWM0_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 76800 * KHz,
-				.fc0_src = FC_NUM(0, 5),
-				),
-
-	[RP1_CLK_PWM1] = REGISTER_CLK(
-				.name = "clk_pwm1",
-				.parents = {"", // "pll_audio_pri_ph",
-					    "pll_video_sec",
-					    "xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 9,
-				.ctrl_reg = CLK_PWM1_CTRL,
-				.div_int_reg = CLK_PWM1_DIV_INT,
-				.div_frac_reg = CLK_PWM1_DIV_FRAC,
-				.sel_reg = CLK_PWM1_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 76800 * KHz,
-				.fc0_src = FC_NUM(1, 5),
-				),
-
-	[RP1_CLK_AUDIO_IN] = REGISTER_CLK(
-				.name = "clk_audio_in",
-				.parents = {"", //"pll_audio",
-					    "", //"pll_audio_pri_ph",
-					    "", //"pll_audio_sec",
-					    "pll_video_sec",
-					    "xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 11,
-				.ctrl_reg = CLK_AUDIO_IN_CTRL,
-				.div_int_reg = CLK_AUDIO_IN_DIV_INT,
-				.sel_reg = CLK_AUDIO_IN_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 76800 * KHz,
-				.fc0_src = FC_NUM(2, 5),
-				),
-
-	[RP1_CLK_AUDIO_OUT] = REGISTER_CLK(
-				.name = "clk_audio_out",
-				.parents = {"", //"pll_audio",
-					    "pll_audio_sec",
-					    "pll_video_sec",
-					    "xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 10,
-				.ctrl_reg = CLK_AUDIO_OUT_CTRL,
-				.div_int_reg = CLK_AUDIO_OUT_DIV_INT,
-				.sel_reg = CLK_AUDIO_OUT_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 153600 * KHz,
-				.fc0_src = FC_NUM(3, 5),
-				),
-
-	[RP1_CLK_I2S] = REGISTER_CLK(
-				.name = "clk_i2s",
-				.parents = {"xosc",
-					    "pll_audio",
-					    "pll_audio_sec",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 9,
-				.ctrl_reg = CLK_I2S_CTRL,
-				.div_int_reg = CLK_I2S_DIV_INT,
-				.sel_reg = CLK_I2S_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 50 * MHz,
-				.fc0_src = FC_NUM(4, 4),
-				.flags = CLK_SET_RATE_PARENT,
-				),
-
-	[RP1_CLK_MIPI0_CFG] = REGISTER_CLK(
-				.name = "clk_mipi0_cfg",
-				.parents = {"xosc"},
-				.num_std_parents = 0,
-				.num_aux_parents = 1,
-				.ctrl_reg = CLK_MIPI0_CFG_CTRL,
-				.div_int_reg = CLK_MIPI0_CFG_DIV_INT,
-				.sel_reg = CLK_MIPI0_CFG_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 50 * MHz,
-				.fc0_src = FC_NUM(4, 5),
-				),
-
-	[RP1_CLK_MIPI1_CFG] = REGISTER_CLK(
-				.name = "clk_mipi1_cfg",
-				.parents = {"xosc"},
-				.num_std_parents = 0,
-				.num_aux_parents = 1,
-				.ctrl_reg = CLK_MIPI1_CFG_CTRL,
-				.div_int_reg = CLK_MIPI1_CFG_DIV_INT,
-				.sel_reg = CLK_MIPI1_CFG_SEL,
-				.clk_src_mask = 1,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 50 * MHz,
-				.fc0_src = FC_NUM(5, 6),
-				),
-
-	[RP1_CLK_ETH_TSU] = REGISTER_CLK(
-				.name = "clk_eth_tsu",
-				.parents = {"xosc",
-					    "pll_video_sec",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 8,
-				.ctrl_reg = CLK_ETH_TSU_CTRL,
-				.div_int_reg = CLK_ETH_TSU_DIV_INT,
-				.sel_reg = CLK_ETH_TSU_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 50 * MHz,
-				.fc0_src = FC_NUM(5, 7),
-				),
-
-	[RP1_CLK_ADC] = REGISTER_CLK(
-				.name = "clk_adc",
-				.parents = {"xosc",
-					    "", //"pll_audio_tern",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5"},
-				.num_std_parents = 0,
-				.num_aux_parents = 8,
-				.ctrl_reg = CLK_ADC_CTRL,
-				.div_int_reg = CLK_ADC_DIV_INT,
-				.sel_reg = CLK_ADC_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 50 * MHz,
-				.fc0_src = FC_NUM(5, 5),
-				),
-
-	[RP1_CLK_SDIO_TIMER] = REGISTER_CLK(
-				.name = "clk_sdio_timer",
-				.parents = {"xosc"},
-				.num_std_parents = 0,
-				.num_aux_parents = 1,
-				.ctrl_reg = CLK_SDIO_TIMER_CTRL,
-				.div_int_reg = CLK_SDIO_TIMER_DIV_INT,
-				.sel_reg = CLK_SDIO_TIMER_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 50 * MHz,
-				.fc0_src = FC_NUM(3, 4),
-				),
-
-	[RP1_CLK_SDIO_ALT_SRC] = REGISTER_CLK(
-				.name = "clk_sdio_alt_src",
-				.parents = {"pll_sys"},
-				.num_std_parents = 0,
-				.num_aux_parents = 1,
-				.ctrl_reg = CLK_SDIO_ALT_SRC_CTRL,
-				.div_int_reg = CLK_SDIO_ALT_SRC_DIV_INT,
-				.sel_reg = CLK_SDIO_ALT_SRC_SEL,
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 200 * MHz,
-				.fc0_src = FC_NUM(5, 4),
-				),
-
-	[RP1_CLK_GP0] = REGISTER_CLK(
-				.name = "clk_gp0",
-				.parents = {"xosc",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5",
-					    "pll_sys",
-					    "", //"pll_audio",
-					    "",
-					    "",
-					    "clk_i2s",
-					    "clk_adc",
-					    "",
-					    "",
-					    "",
-					    "clk_sys"},
-				.num_std_parents = 0,
-				.num_aux_parents = 16,
-				.oe_mask = BIT(0),
-				.ctrl_reg = CLK_GP0_CTRL,
-				.div_int_reg = CLK_GP0_DIV_INT,
-				.div_frac_reg = CLK_GP0_DIV_FRAC,
-				.sel_reg = CLK_GP0_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(0, 1),
-				),
-
-	[RP1_CLK_GP1] = REGISTER_CLK(
-				.name = "clk_gp1",
-				.parents = {"clk_sdio_timer",
-					    "clksrc_gp0",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5",
-					    "pll_sys_pri_ph",
-					    "", //"pll_audio_pri_ph",
-					    "",
-					    "",
-					    "clk_adc",
-					    "clk_dpi",
-					    "clk_pwm0",
-					    "",
-					    "",
-					    ""},
-				.num_std_parents = 0,
-				.num_aux_parents = 16,
-				.oe_mask = BIT(1),
-				.ctrl_reg = CLK_GP1_CTRL,
-				.div_int_reg = CLK_GP1_DIV_INT,
-				.div_frac_reg = CLK_GP1_DIV_FRAC,
-				.sel_reg = CLK_GP1_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(1, 1),
-				),
-
-	[RP1_CLK_GP2] = REGISTER_CLK(
-				.name = "clk_gp2",
-				.parents = {"clk_sdio_alt_src",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "clksrc_gp5",
-					    "pll_sys_sec",
-					    "", //"pll_audio_sec",
-					    "pll_video",
-					    "clk_audio_in",
-					    "clk_dpi",
-					    "clk_pwm0",
-					    "clk_pwm1",
-					    "clk_mipi0_dpi",
-					    "clk_mipi1_cfg",
-					    "clk_sys"},
-				.num_std_parents = 0,
-				.num_aux_parents = 16,
-				.oe_mask = BIT(2),
-				.ctrl_reg = CLK_GP2_CTRL,
-				.div_int_reg = CLK_GP2_DIV_INT,
-				.div_frac_reg = CLK_GP2_DIV_FRAC,
-				.sel_reg = CLK_GP2_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(2, 1),
-				),
-
-	[RP1_CLK_GP3] = REGISTER_CLK(
-				.name = "clk_gp3",
-				.parents = {"xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp4",
-					    "clksrc_gp5",
-					    "",
-					    "",
-					    "pll_video_pri_ph",
-					    "clk_audio_out",
-					    "",
-					    "",
-					    "clk_mipi1_dpi",
-					    "",
-					    "",
-					    ""},
-				.num_std_parents = 0,
-				.num_aux_parents = 16,
-				.oe_mask = BIT(3),
-				.ctrl_reg = CLK_GP3_CTRL,
-				.div_int_reg = CLK_GP3_DIV_INT,
-				.div_frac_reg = CLK_GP3_DIV_FRAC,
-				.sel_reg = CLK_GP3_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(3, 1),
-				),
-
-	[RP1_CLK_GP4] = REGISTER_CLK(
-				.name = "clk_gp4",
-				.parents = {"xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp5",
-					    "", //"pll_audio_tern",
-					    "pll_video_sec",
-					    "",
-					    "",
-					    "",
-					    "clk_mipi0_cfg",
-					    "clk_uart",
-					    "",
-					    "",
-					    "clk_sys",
-					    },
-				.num_std_parents = 0,
-				.num_aux_parents = 16,
-				.oe_mask = BIT(4),
-				.ctrl_reg = CLK_GP4_CTRL,
-				.div_int_reg = CLK_GP4_DIV_INT,
-				.div_frac_reg = CLK_GP4_DIV_FRAC,
-				.sel_reg = CLK_GP4_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(4, 1),
-				),
-
-	[RP1_CLK_GP5] = REGISTER_CLK(
-				.name = "clk_gp5",
-				.parents = {"xosc",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4",
-					    "", //"pll_audio_tern",
-					    "pll_video_sec",
-					    "clk_eth_tsu",
-					    "",
-					    "clk_vec",
-					    "",
-					    "",
-					    "",
-					    "",
-					    ""},
-				.num_std_parents = 0,
-				.num_aux_parents = 16,
-				.oe_mask = BIT(5),
-				.ctrl_reg = CLK_GP5_CTRL,
-				.div_int_reg = CLK_GP5_DIV_INT,
-				.div_frac_reg = CLK_GP5_DIV_FRAC,
-				.sel_reg = CLK_GP5_SEL,
-				.div_int_max = DIV_INT_16BIT_MAX,
-				.max_freq = 100 * MHz,
-				.fc0_src = FC_NUM(5, 1),
-				),
-
-	[RP1_CLK_VEC] = REGISTER_CLK(
-				.name = "clk_vec",
-				.parents = {"pll_sys_pri_ph",
-					    "pll_video_sec",
-					    "pll_video",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4"},
-				.num_std_parents = 0,
-				.num_aux_parents = 8, /* XXX in fact there are more than 8 */
-				.ctrl_reg = VIDEO_CLK_VEC_CTRL,
-				.div_int_reg = VIDEO_CLK_VEC_DIV_INT,
-				.sel_reg = VIDEO_CLK_VEC_SEL,
-				.flags = CLK_SET_RATE_NO_REPARENT, /* Let VEC driver set parent */
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 108 * MHz,
-				.fc0_src = FC_NUM(0, 6),
-				),
-
-	[RP1_CLK_DPI] = REGISTER_CLK(
-				.name = "clk_dpi",
-				.parents = {"pll_sys",
-					    "pll_video_sec",
-					    "pll_video",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3",
-					    "clksrc_gp4"},
-				.num_std_parents = 0,
-				.num_aux_parents = 8, /* XXX in fact there are more than 8 */
-				.ctrl_reg = VIDEO_CLK_DPI_CTRL,
-				.div_int_reg = VIDEO_CLK_DPI_DIV_INT,
-				.sel_reg = VIDEO_CLK_DPI_SEL,
-				.flags = CLK_SET_RATE_NO_REPARENT, /* Let DPI driver set parent */
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 200 * MHz,
-				.fc0_src = FC_NUM(1, 6),
-				),
-
-	[RP1_CLK_MIPI0_DPI] = REGISTER_CLK(
-				.name = "clk_mipi0_dpi",
-				.parents = {"pll_sys",
-					    "pll_video_sec",
-					    "pll_video",
-					    "clksrc_mipi0_dsi_byteclk",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3"},
-				.num_std_parents = 0,
-				.num_aux_parents = 8, /* XXX in fact there are more than 8 */
-				.ctrl_reg = VIDEO_CLK_MIPI0_DPI_CTRL,
-				.div_int_reg = VIDEO_CLK_MIPI0_DPI_DIV_INT,
-				.div_frac_reg = VIDEO_CLK_MIPI0_DPI_DIV_FRAC,
-				.sel_reg = VIDEO_CLK_MIPI0_DPI_SEL,
-				.flags = CLK_SET_RATE_NO_REPARENT, /* Let DSI driver set parent */
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 200 * MHz,
-				.fc0_src = FC_NUM(2, 6),
-				),
-
-	[RP1_CLK_MIPI1_DPI] = REGISTER_CLK(
-				.name = "clk_mipi1_dpi",
-				.parents = {"pll_sys",
-					    "pll_video_sec",
-					    "pll_video",
-					    "clksrc_mipi1_dsi_byteclk",
-					    "clksrc_gp0",
-					    "clksrc_gp1",
-					    "clksrc_gp2",
-					    "clksrc_gp3"},
-				.num_std_parents = 0,
-				.num_aux_parents = 8, /* XXX in fact there are more than 8 */
-				.ctrl_reg = VIDEO_CLK_MIPI1_DPI_CTRL,
-				.div_int_reg = VIDEO_CLK_MIPI1_DPI_DIV_INT,
-				.div_frac_reg = VIDEO_CLK_MIPI1_DPI_DIV_FRAC,
-				.sel_reg = VIDEO_CLK_MIPI1_DPI_SEL,
-				.flags = CLK_SET_RATE_NO_REPARENT, /* Let DSI driver set parent */
-				.div_int_max = DIV_INT_8BIT_MAX,
-				.max_freq = 200 * MHz,
-				.fc0_src = FC_NUM(3, 6),
-				),
-
-	[RP1_CLK_MIPI0_DSI_BYTECLOCK] = REGISTER_VARSRC("clksrc_mipi0_dsi_byteclk"),
-	[RP1_CLK_MIPI1_DSI_BYTECLOCK] = REGISTER_VARSRC("clksrc_mipi1_dsi_byteclk"),
+static const struct regmap_config rp1_clk_regmap_cfg = {
+	.reg_bits = 32,
+	.val_bits = 32,
+	.reg_stride = 4,
+	.max_register = PLL_VIDEO_SEC,
+	.name = "rp1-clk",
+	.rd_table = &rp1_reg_table,
+	.disable_locking = true,
 };
 
 static int rp1_clk_probe(struct platform_device *pdev)
@@ -2445,28 +1753,15 @@ static int rp1_clk_probe(struct platform_device *pdev)
 	hws = clockman->onecell.hws;
 
 	for (i = 0; i < asize; i++) {
-		desc = &clk_desc_array[i];
-		if (desc->clk_register && desc->data) {
-			hws[i] = desc->clk_register(clockman, desc->data);
-			if (IS_ERR_OR_NULL(hws[i])) {
-				pr_err("Failed to register RP1 clock '%s' (%ld) - wrong dtbs?\n", *(char **)desc->data, PTR_ERR(hws[i]));
-				hws[i] = NULL;
-				continue;
-			}
-			if (!strcmp(clk_hw_get_name(hws[i]), "clk_i2s")) {
-				clk_i2s = hws[i];
-				clk_xosc = clk_hw_get_parent_by_index(clk_i2s, 0);
-				clk_audio = clk_hw_get_parent_by_index(clk_i2s, 1);
-			}
-		}
+		desc = clk_desc_array[i];
+		if (desc && desc->clk_register && desc->data)
+			hws[i] = desc->clk_register(clockman, desc);
 	}
 
-	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-				     &clockman->onecell);
-	if (ret)
-		return ret;
+	platform_set_drvdata(pdev, clockman);
 
-	return 0;
+	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
+					   &clockman->onecell);
 }
 
 static const struct of_device_id rp1_clk_of_match[] = {
