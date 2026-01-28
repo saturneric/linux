@@ -924,8 +924,8 @@ static void gpiochip_machine_hog(struct gpio_chip *gc, struct gpiod_hog *hog)
 
 	desc = gpiochip_get_desc(gc, hog->chip_hwnum);
 	if (IS_ERR(desc)) {
-		chip_err(gc, "%s: unable to get GPIO desc: %ld\n", __func__,
-			 PTR_ERR(desc));
+		gpiochip_err(gc, "%s: unable to get GPIO desc: %ld\n",
+			     __func__, PTR_ERR(desc));
 		return;
 	}
 
@@ -1104,6 +1104,18 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 	gdev->ngpio = gc->ngpio;
 	gdev->can_sleep = gc->can_sleep;
 
+	rwlock_init(&gdev->line_state_lock);
+	RAW_INIT_NOTIFIER_HEAD(&gdev->line_state_notifier);
+	BLOCKING_INIT_NOTIFIER_HEAD(&gdev->device_notifier);
+
+	ret = init_srcu_struct(&gdev->srcu);
+	if (ret)
+		goto err_free_label;
+
+	ret = init_srcu_struct(&gdev->desc_srcu);
+	if (ret)
+		goto err_cleanup_gdev_srcu;
+
 	scoped_guard(mutex, &gpio_devices_lock) {
 		/*
 		 * TODO: this allocates a Linux GPIO number base in the global
@@ -1118,7 +1130,7 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 			if (base < 0) {
 				ret = base;
 				base = 0;
-				goto err_free_label;
+				goto err_cleanup_desc_srcu;
 			}
 
 			/*
@@ -1137,22 +1149,10 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 
 		ret = gpiodev_add_to_list_unlocked(gdev);
 		if (ret) {
-			chip_err(gc, "GPIO integer space overlap, cannot add chip\n");
-			goto err_free_label;
+			gpiochip_err(gc, "GPIO integer space overlap, cannot add chip\n");
+			goto err_cleanup_desc_srcu;
 		}
 	}
-
-	rwlock_init(&gdev->line_state_lock);
-	RAW_INIT_NOTIFIER_HEAD(&gdev->line_state_notifier);
-	BLOCKING_INIT_NOTIFIER_HEAD(&gdev->device_notifier);
-
-	ret = init_srcu_struct(&gdev->srcu);
-	if (ret)
-		goto err_remove_from_list;
-
-	ret = init_srcu_struct(&gdev->desc_srcu);
-	if (ret)
-		goto err_cleanup_gdev_srcu;
 
 #ifdef CONFIG_PINCTRL
 	INIT_LIST_HEAD(&gdev->pin_ranges);
@@ -1163,11 +1163,11 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
 
 	ret = gpiochip_set_names(gc);
 	if (ret)
-		goto err_cleanup_desc_srcu;
+		goto err_remove_from_list;
 
 	ret = gpiochip_init_valid_mask(gc);
 	if (ret)
-		goto err_cleanup_desc_srcu;
+		goto err_remove_from_list;
 
 	for (desc_index = 0; desc_index < gc->ngpio; desc_index++) {
 		struct gpio_desc *desc = &gdev->descs[desc_index];
@@ -1240,10 +1240,6 @@ err_remove_of_chip:
 	of_gpiochip_remove(gc);
 err_free_valid_mask:
 	gpiochip_free_valid_mask(gc);
-err_cleanup_desc_srcu:
-	cleanup_srcu_struct(&gdev->desc_srcu);
-err_cleanup_gdev_srcu:
-	cleanup_srcu_struct(&gdev->srcu);
 err_remove_from_list:
 	scoped_guard(mutex, &gpio_devices_lock)
 		list_del_rcu(&gdev->list);
@@ -1253,6 +1249,10 @@ err_remove_from_list:
 		gpio_device_put(gdev);
 		goto err_print_message;
 	}
+err_cleanup_desc_srcu:
+	cleanup_srcu_struct(&gdev->desc_srcu);
+err_cleanup_gdev_srcu:
+	cleanup_srcu_struct(&gdev->srcu);
 err_free_label:
 	kfree_const(gdev->label);
 err_free_descs:
@@ -1541,8 +1541,7 @@ static void gpiochip_set_hierarchical_irqchip(struct gpio_chip *gc,
 							  &parent_hwirq,
 							  &parent_type);
 			if (ret) {
-				chip_err(gc, "skip set-up on hwirq %d\n",
-					 i);
+				gpiochip_err(gc, "skip set-up on hwirq %d\n", i);
 				continue;
 			}
 
@@ -1555,15 +1554,14 @@ static void gpiochip_set_hierarchical_irqchip(struct gpio_chip *gc,
 			ret = irq_domain_alloc_irqs(gc->irq.domain, 1,
 						    NUMA_NO_NODE, &fwspec);
 			if (ret < 0) {
-				chip_err(gc,
-					 "can not allocate irq for GPIO line %d parent hwirq %d in hierarchy domain: %d\n",
-					 i, parent_hwirq,
-					 ret);
+				gpiochip_err(gc,
+					     "can not allocate irq for GPIO line %d parent hwirq %d in hierarchy domain: %d\n",
+					     i, parent_hwirq, ret);
 			}
 		}
 	}
 
-	chip_err(gc, "%s unknown fwnode type proceed anyway\n", __func__);
+	gpiochip_err(gc, "%s unknown fwnode type proceed anyway\n", __func__);
 
 	return;
 }
@@ -1615,15 +1613,15 @@ static int gpiochip_hierarchy_irq_domain_alloc(struct irq_domain *d,
 	if (ret)
 		return ret;
 
-	chip_dbg(gc, "allocate IRQ %d, hwirq %lu\n", irq, hwirq);
+	gpiochip_dbg(gc, "allocate IRQ %d, hwirq %lu\n", irq, hwirq);
 
 	ret = girq->child_to_parent_hwirq(gc, hwirq, type,
 					  &parent_hwirq, &parent_type);
 	if (ret) {
-		chip_err(gc, "can't look up hwirq %lu\n", hwirq);
+		gpiochip_err(gc, "can't look up hwirq %lu\n", hwirq);
 		return ret;
 	}
-	chip_dbg(gc, "found parent hwirq %u\n", parent_hwirq);
+	gpiochip_dbg(gc, "found parent hwirq %u\n", parent_hwirq);
 
 	/*
 	 * We set handle_bad_irq because the .set_type() should
@@ -1644,8 +1642,8 @@ static int gpiochip_hierarchy_irq_domain_alloc(struct irq_domain *d,
 	if (ret)
 		return ret;
 
-	chip_dbg(gc, "alloc_irqs_parent for %d parent hwirq %d\n",
-		  irq, parent_hwirq);
+	gpiochip_dbg(gc, "alloc_irqs_parent for %d parent hwirq %d\n",
+		     irq, parent_hwirq);
 	irq_set_lockdep_class(irq, gc->irq.lock_key, gc->irq.request_key);
 	ret = irq_domain_alloc_irqs_parent(d, irq, 1, &gpio_parent_fwspec);
 	/*
@@ -1655,9 +1653,9 @@ static int gpiochip_hierarchy_irq_domain_alloc(struct irq_domain *d,
 	if (irq_domain_is_msi(d->parent) && (ret == -EEXIST))
 		ret = 0;
 	if (ret)
-		chip_err(gc,
-			 "failed to allocate parent hwirq %d for hwirq %lu\n",
-			 parent_hwirq, hwirq);
+		gpiochip_err(gc,
+			     "failed to allocate parent hwirq %d for hwirq %lu\n",
+			     parent_hwirq, hwirq);
 
 	return ret;
 }
@@ -1733,7 +1731,7 @@ static struct irq_domain *gpiochip_hierarchy_create_domain(struct gpio_chip *gc)
 
 	if (!gc->irq.child_to_parent_hwirq ||
 	    !gc->irq.fwnode) {
-		chip_err(gc, "missing irqdomain vital data\n");
+		gpiochip_err(gc, "missing irqdomain vital data\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -2006,7 +2004,7 @@ static void gpiochip_set_irq_hooks(struct gpio_chip *gc)
 	if (irqchip->flags & IRQCHIP_IMMUTABLE)
 		return;
 
-	chip_warn(gc, "not an immutable chip, please consider fixing it!\n");
+	gpiochip_warn(gc, "not an immutable chip, please consider fixing it!\n");
 
 	if (!irqchip->irq_request_resources &&
 	    !irqchip->irq_release_resources) {
@@ -2022,8 +2020,8 @@ static void gpiochip_set_irq_hooks(struct gpio_chip *gc)
 		 * ...and if so, give a gentle warning that this is bad
 		 * practice.
 		 */
-		chip_info(gc,
-			  "detected irqchip that is shared with multiple gpiochips: please fix the driver.\n");
+		gpiochip_info(gc,
+			      "detected irqchip that is shared with multiple gpiochips: please fix the driver.\n");
 		return;
 	}
 
@@ -2052,7 +2050,8 @@ static int gpiochip_irqchip_add_allocated_domain(struct gpio_chip *gc,
 		return -EINVAL;
 
 	if (gc->to_irq)
-		chip_warn(gc, "to_irq is redefined in %s and you shouldn't rely on it\n", __func__);
+		gpiochip_warn(gc, "to_irq is redefined in %s and you shouldn't rely on it\n",
+			      __func__);
 
 	gc->to_irq = gpiochip_to_irq;
 	gc->irq.domain = domain;
@@ -2093,7 +2092,7 @@ static int gpiochip_add_irqchip(struct gpio_chip *gc,
 		return 0;
 
 	if (gc->irq.parent_handler && gc->can_sleep) {
-		chip_err(gc, "you cannot have chained interrupts on a chip that may sleep\n");
+		gpiochip_err(gc, "you cannot have chained interrupts on a chip that may sleep\n");
 		return -EINVAL;
 	}
 
@@ -2329,10 +2328,8 @@ int gpiochip_add_pingroup_range(struct gpio_chip *gc,
 	int ret;
 
 	pin_range = kzalloc(sizeof(*pin_range), GFP_KERNEL);
-	if (!pin_range) {
-		chip_err(gc, "failed to allocate pin ranges\n");
+	if (!pin_range)
 		return -ENOMEM;
-	}
 
 	/* Use local offset as range ID */
 	pin_range->range.id = gpio_offset;
@@ -2351,7 +2348,7 @@ int gpiochip_add_pingroup_range(struct gpio_chip *gc,
 
 	pinctrl_add_gpio_range(pctldev, &pin_range->range);
 
-	chip_dbg(gc, "created GPIO range %d->%d ==> %s PINGRP %s\n",
+	gpiochip_dbg(gc, "created GPIO range %d->%d ==> %s PINGRP %s\n",
 		 gpio_offset, gpio_offset + pin_range->range.npins - 1,
 		 pinctrl_dev_get_devname(pctldev), pin_group);
 
@@ -2392,10 +2389,8 @@ int gpiochip_add_pin_range_with_pins(struct gpio_chip *gc,
 	int ret;
 
 	pin_range = kzalloc(sizeof(*pin_range), GFP_KERNEL);
-	if (!pin_range) {
-		chip_err(gc, "failed to allocate pin ranges\n");
+	if (!pin_range)
 		return -ENOMEM;
-	}
 
 	/* Use local offset as range ID */
 	pin_range->range.id = gpio_offset;
@@ -2409,19 +2404,18 @@ int gpiochip_add_pin_range_with_pins(struct gpio_chip *gc,
 			&pin_range->range);
 	if (IS_ERR(pin_range->pctldev)) {
 		ret = PTR_ERR(pin_range->pctldev);
-		chip_err(gc, "could not create pin range\n");
+		gpiochip_err(gc, "could not create pin range\n");
 		kfree(pin_range);
 		return ret;
 	}
 	if (pin_range->range.pins)
-		chip_dbg(gc, "created GPIO range %d->%d ==> %s %d sparse PIN range { %d, ... }",
-			 gpio_offset, gpio_offset + npins - 1,
-			 pinctl_name, npins, pins[0]);
+		gpiochip_dbg(gc, "created GPIO range %d->%d ==> %s %d sparse PIN range { %d, ... }",
+			     gpio_offset, gpio_offset + npins - 1,
+			     pinctl_name, npins, pins[0]);
 	else
-		chip_dbg(gc, "created GPIO range %d->%d ==> %s PIN %d->%d\n",
-			 gpio_offset, gpio_offset + npins - 1,
-			 pinctl_name,
-			 pin_offset, pin_offset + npins - 1);
+		gpiochip_dbg(gc, "created GPIO range %d->%d ==> %s PIN %d->%d\n",
+			     gpio_offset, gpio_offset + npins - 1, pinctl_name,
+			     pin_offset, pin_offset + npins - 1);
 
 	list_add_tail(&pin_range->node, &gdev->pin_ranges);
 
@@ -2631,7 +2625,7 @@ struct gpio_desc *gpiochip_request_own_desc(struct gpio_chip *gc,
 	int ret;
 
 	if (IS_ERR(desc)) {
-		chip_err(gc, "failed to get GPIO %s descriptor\n", name);
+		gpiochip_err(gc, "failed to get GPIO %s descriptor\n", name);
 		return desc;
 	}
 
@@ -2642,7 +2636,7 @@ struct gpio_desc *gpiochip_request_own_desc(struct gpio_chip *gc,
 	ret = gpiod_configure_flags(desc, label, lflags, dflags);
 	if (ret) {
 		gpiod_free_commit(desc);
-		chip_err(gc, "setup of own GPIO %s failed\n", name);
+		gpiochip_err(gc, "setup of own GPIO %s failed\n", name);
 		return ERR_PTR(ret);
 	}
 
@@ -4069,8 +4063,8 @@ int gpiochip_lock_as_irq(struct gpio_chip *gc, unsigned int offset)
 		int dir = gpiod_get_direction(desc);
 
 		if (dir < 0) {
-			chip_err(gc, "%s: cannot get GPIO direction\n",
-				 __func__);
+			gpiochip_err(gc, "%s: cannot get GPIO direction\n",
+				     __func__);
 			return dir;
 		}
 	}
@@ -4078,9 +4072,9 @@ int gpiochip_lock_as_irq(struct gpio_chip *gc, unsigned int offset)
 	/* To be valid for IRQ the line needs to be input or open drain */
 	if (test_bit(GPIOD_FLAG_IS_OUT, &desc->flags) &&
 	    !test_bit(GPIOD_FLAG_OPEN_DRAIN, &desc->flags)) {
-		chip_err(gc,
-			 "%s: tried to flag a GPIO set as output for IRQ\n",
-			 __func__);
+		gpiochip_err(gc,
+			     "%s: tried to flag a GPIO set as output for IRQ\n",
+			     __func__);
 		return -EIO;
 	}
 
@@ -4157,7 +4151,7 @@ int gpiochip_reqres_irq(struct gpio_chip *gc, unsigned int offset)
 
 	ret = gpiochip_lock_as_irq(gc, offset);
 	if (ret) {
-		chip_err(gc, "unable to lock HW IRQ %u for IRQ\n", offset);
+		gpiochip_err(gc, "unable to lock HW IRQ %u for IRQ\n", offset);
 		module_put(gc->gpiodev->owner);
 		return ret;
 	}
