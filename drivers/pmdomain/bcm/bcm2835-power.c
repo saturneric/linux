@@ -453,7 +453,7 @@ static int bcm2835_power_pd_power_off(struct generic_pm_domain *domain)
 	case BCM2835_POWER_DOMAIN_GRAFX_V3D:
 		if (!power->asb)
 			return bcm2835_asb_power_off(pd, PM_GRAFX_2712,
-						    0, 0, PM_V3DRSTN);
+						     0, 0, PM_V3DRSTN);
 		return bcm2835_asb_power_off(pd, PM_GRAFX,
 					     ASB_V3D_M_CTRL, ASB_V3D_S_CTRL,
 					     PM_V3DRSTN);
@@ -644,6 +644,14 @@ static int bcm2835_power_probe(struct platform_device *pdev)
 
 	if (power->asb) {
 		id = readl(power->asb + ASB_AXI_BRDG_ID);
+		if (id != BCM2835_BRDG_ID /* "BRDG" */) {
+			dev_err(dev, "ASB register ID returned 0x%08x\n", id);
+			return -ENODEV;
+		}
+	}
+
+	if (power->rpivid_asb) {
+		id = readl(power->rpivid_asb + ASB_AXI_BRDG_ID);
 		if (id != BCM2835_BRDG_ID /* "BRDG" */) {
 			dev_err(dev, "ASB register ID returned 0x%08x\n", id);
 			return -ENODEV;
