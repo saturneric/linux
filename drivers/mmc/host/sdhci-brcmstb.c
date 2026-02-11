@@ -372,104 +372,6 @@ static void sdhci_brcmstb_cfginit_2712(struct sdhci_host *host)
 	writel(reg, brcmstb_priv->cfg_regs + SDIO_CFG_CQ_CAPABILITY);
 }
 
-static int bcm2712_init_sd_express(struct sdhci_host *host, struct mmc_ios *ios)
-{
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_brcmstb_priv *brcmstb_priv = sdhci_pltfm_priv(pltfm_host);
-	struct device *dev = host->mmc->parent;
-	u32 ctrl_val;
-	u32 present_state;
-	int ret;
-
-	if (!brcmstb_priv->sde_ioaddr || !brcmstb_priv->sde_ioaddr2)
-		return -EINVAL;
-
-	if (!brcmstb_priv->pinctrl)
-		return -EINVAL;
-
-	/* Turn off the SD clock first */
-	sdhci_set_clock(host, 0);
-
-	/* Disable SD DAT0-3 pulls */
-	pinctrl_select_state(brcmstb_priv->pinctrl, brcmstb_priv->pins_sdex);
-
-	ctrl_val = readl(brcmstb_priv->sde_ioaddr);
-	dev_dbg(dev, "ctrl_val 1 %08x\n", ctrl_val);
-
-	/* Tri-state the SD pins */
-	ctrl_val |= 0x1ff8;
-	writel(ctrl_val, brcmstb_priv->sde_ioaddr);
-	dev_dbg(dev, "ctrl_val 1->%08x (%08x)\n", ctrl_val, readl(brcmstb_priv->sde_ioaddr));
-	/* Let voltages settle */
-	udelay(100);
-
-	/* Enable the PCIe sideband pins */
-	ctrl_val &= ~0x6000;
-	writel(ctrl_val, brcmstb_priv->sde_ioaddr);
-	dev_dbg(dev, "ctrl_val 1->%08x (%08x)\n", ctrl_val, readl(brcmstb_priv->sde_ioaddr));
-	/* Let voltages settle */
-	udelay(100);
-
-	/* Turn on the 1v8 VDD2 regulator */
-	ret = regulator_enable(brcmstb_priv->sde_1v8);
-	if (ret)
-		return ret;
-
-	/* Wait for Tpvcrl */
-	msleep(1);
-
-	/* Sample DAT2 (CLKREQ#) - if low, card is in PCIe mode */
-	present_state = sdhci_readl(host, SDHCI_PRESENT_STATE);
-	present_state = (present_state & SDHCI_DATA_LVL_MASK) >> SDHCI_DATA_LVL_SHIFT;
-	dev_dbg(dev, "state = 0x%08x\n", present_state);
-
-	if (present_state & BIT(2)) {
-		dev_err(dev, "DAT2 still high, abandoning SDex switch\n");
-		return -ENODEV;
-	}
-
-	/* Turn on the LCPLL PTEST mux */
-	ctrl_val = readl(brcmstb_priv->sde_ioaddr2 + 20); // misc5
-	ctrl_val &= ~(0x7 << 7);
-	ctrl_val |= 3 << 7;
-	writel(ctrl_val, brcmstb_priv->sde_ioaddr2 + 20);
-	dev_dbg(dev, "misc 5->%08x (%08x)\n", ctrl_val, readl(brcmstb_priv->sde_ioaddr2 + 20));
-
-	/* PTEST diff driver enable */
-	ctrl_val = readl(brcmstb_priv->sde_ioaddr2);
-	ctrl_val |= BIT(21);
-	writel(ctrl_val, brcmstb_priv->sde_ioaddr2);
-
-	dev_dbg(dev, "misc 0->%08x (%08x)\n", ctrl_val, readl(brcmstb_priv->sde_ioaddr2));
-
-	/* Wait for more than the minimum Tpvpgl time */
-	msleep(100);
-
-	if (brcmstb_priv->sde_pcie) {
-		struct of_changeset changeset;
-		static struct property okay_property = {
-			.name = "status",
-			.value = "okay",
-			.length = 5,
-		};
-
-		/* Enable the pcie controller */
-		of_changeset_init(&changeset);
-		ret = of_changeset_update_property(&changeset,
-						   brcmstb_priv->sde_pcie,
-						   &okay_property);
-		if (ret) {
-			dev_err(dev, "%s: failed to update property - %d\n", __func__,
-			       ret);
-			return -ENODEV;
-		}
-		ret = of_changeset_apply(&changeset);
-	}
-
-	dev_dbg(dev, "%s -> %d\n", __func__, ret);
-	return ret;
-}
-
 static void sdhci_brcmstb_set_72116_uhs_signaling(struct sdhci_host *host, unsigned int timing)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -540,7 +442,6 @@ static struct sdhci_ops sdhci_brcmstb_ops_2712 = {
 	.set_bus_width = sdhci_set_bus_width,
 	.reset = brcmstb_reset,
 	.set_uhs_signaling = sdhci_set_uhs_signaling,
-	.init_sd_express = bcm2712_init_sd_express,
 };
 
 static struct sdhci_ops sdhci_brcmstb_ops_72116 = {
@@ -686,10 +587,8 @@ static int sdhci_brcmstb_probe(struct platform_device *pdev)
 	struct sdhci_pltfm_host *pltfm_host;
 	const struct of_device_id *match;
 	struct sdhci_brcmstb_priv *priv;
-	u32 actual_clock_mhz, cqe;
+	u32 actual_clock_mhz;
 	struct sdhci_host *host;
-	struct resource *iomem;
-	bool no_pinctrl = false;
 	struct clk *clk;
 	struct clk *base_clk = NULL;
 	int res;
@@ -720,11 +619,6 @@ static int sdhci_brcmstb_probe(struct platform_device *pdev)
 		priv->flags |= BRCMSTB_PRIV_FLAGS_HAS_CQE;
 		match_priv->ops->irq = sdhci_brcmstb_cqhci_irq;
 	}
-
-	priv->sde_pcie = of_parse_phandle(pdev->dev.of_node,
-					  "sde-pcie", 0);
-	if (priv->sde_pcie)
-		priv->flags |= BRCMSTB_PRIV_FLAGS_HAS_SD_EXPRESS;
 
 	/* Map in the non-standard CFG registers */
 	priv->cfg_regs = devm_platform_get_and_ioremap_resource(pdev, 1, NULL);

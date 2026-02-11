@@ -208,7 +208,7 @@ fail:
 
 dwc_bool_t DWC_IN_IRQ(void)
 {
-	return in_irq();
+	return in_hardirq();
 }
 
 dwc_bool_t DWC_IN_BH(void)

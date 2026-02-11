@@ -13,6 +13,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/etherdevice.h>
 #include <linux/firmware/xlnx-zynqmp.h>
+#include <linux/gpio/consumer.h>
 #include <linux/inetdevice.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -1617,7 +1618,7 @@ static int macb_rx(struct macb_queue *queue, struct napi_struct *napi,
 		macb_init_rx_ring(queue);
 		queue_writel(queue, RBQP, queue->rx_ring_dma);
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-		if (bp->hw_dma_cap & HW_DMA_CAP_64B)
+		if (bp->caps & MACB_CAPS_DMA_64B)
 			macb_writel(bp, RBQPH,
 				    upper_32_bits(queue->rx_ring_dma));
 #endif

@@ -124,7 +124,8 @@ static unsigned long gpio_mmio_read32be(void __iomem *reg)
 	return ioread32be(reg);
 }
 
-static unsigned long gpio_mmio_line2mask(struct gpio_chip *gc, unsigned int line)
+static unsigned long gpio_mmio_line2mask(struct gpio_chip *gc,
+					 unsigned int line)
 {
 	struct gpio_generic_chip *chip = to_gpio_generic_chip(gc);
 
@@ -173,7 +174,8 @@ static int gpio_mmio_get(struct gpio_chip *gc, unsigned int gpio)
 {
 	struct gpio_generic_chip *chip = to_gpio_generic_chip(gc);
 
-	return !!(chip->read_reg(chip->reg_dat) & gpio_mmio_line2mask(gc, gpio));
+	return !!(chip->read_reg(chip->reg_dat) &
+		  gpio_mmio_line2mask(gc, gpio));
 }
 
 /*
@@ -435,7 +437,8 @@ static int gpio_mmio_dir_in(struct gpio_chip *gc, unsigned int gpio)
 {
 	struct gpio_generic_chip *chip = to_gpio_generic_chip(gc);
 
-	scoped_guard(raw_spinlock_irqsave, &chip->lock) {
+	scoped_guard(raw_spinlock_irqsave, &chip->lock)
+	{
 		chip->sdir &= ~gpio_mmio_line2mask(gc, gpio);
 
 		if (chip->reg_dir_in)
@@ -483,13 +486,15 @@ static int gpio_mmio_get_dir(struct gpio_chip *gc, unsigned int gpio)
 	}
 
 	if (chip->reg_dir_out) {
-		if (chip->read_reg(chip->reg_dir_out) & gpio_mmio_line2mask(gc, gpio))
+		if (chip->read_reg(chip->reg_dir_out) &
+		    gpio_mmio_line2mask(gc, gpio))
 			return GPIO_LINE_DIRECTION_OUT;
 		return GPIO_LINE_DIRECTION_IN;
 	}
 
 	if (chip->reg_dir_in)
-		if (!(chip->read_reg(chip->reg_dir_in) & gpio_mmio_line2mask(gc, gpio)))
+		if (!(chip->read_reg(chip->reg_dir_in) &
+		      gpio_mmio_line2mask(gc, gpio)))
 			return GPIO_LINE_DIRECTION_OUT;
 
 	return GPIO_LINE_DIRECTION_IN;
@@ -570,25 +575,25 @@ static int gpio_mmio_setup_accessors(struct device *dev,
 {
 	switch (chip->bits) {
 	case 8:
-		chip->read_reg	= gpio_mmio_read8;
-		chip->write_reg	= gpio_mmio_write8;
+		chip->read_reg = gpio_mmio_read8;
+		chip->write_reg = gpio_mmio_write8;
 		break;
 	case 16:
 		if (byte_be) {
-			chip->read_reg	= gpio_mmio_read16be;
-			chip->write_reg	= gpio_mmio_write16be;
+			chip->read_reg = gpio_mmio_read16be;
+			chip->write_reg = gpio_mmio_write16be;
 		} else {
-			chip->read_reg	= gpio_mmio_read16;
-			chip->write_reg	= gpio_mmio_write16;
+			chip->read_reg = gpio_mmio_read16;
+			chip->write_reg = gpio_mmio_write16;
 		}
 		break;
 	case 32:
 		if (byte_be) {
-			chip->read_reg	= gpio_mmio_read32be;
-			chip->write_reg	= gpio_mmio_write32be;
+			chip->read_reg = gpio_mmio_read32be;
+			chip->write_reg = gpio_mmio_write32be;
 		} else {
-			chip->read_reg	= gpio_mmio_read32;
-			chip->write_reg	= gpio_mmio_write32;
+			chip->read_reg = gpio_mmio_read32;
+			chip->write_reg = gpio_mmio_write32;
 		}
 		break;
 #if BITS_PER_LONG >= 64
@@ -598,8 +603,8 @@ static int gpio_mmio_setup_accessors(struct device *dev,
 				"64 bit big endian byte order unsupported\n");
 			return -EINVAL;
 		} else {
-			chip->read_reg	= gpio_mmio_read64;
-			chip->write_reg	= gpio_mmio_write64;
+			chip->read_reg = gpio_mmio_read64;
+			chip->write_reg = gpio_mmio_write64;
 		}
 		break;
 #endif /* BITS_PER_LONG >= 64 */
@@ -655,8 +660,8 @@ static int gpio_mmio_setup_io(struct gpio_generic_chip *chip,
 		gc->set = gpio_mmio_set_none;
 		gc->set_multiple = NULL;
 	} else if (cfg->flags & GPIO_GENERIC_REG_DIRECT) {
-		gc->set = bgpio_set_direct;
-		gc->set_multiple = bgpio_set_multiple_direct;
+		gc->set = gpio_mmio_set_direct;
+		gc->set_multiple = gpio_mmio_set_multiple_direct;
 	} else {
 		gc->set = gpio_mmio_set;
 		gc->set_multiple = gpio_mmio_set_multiple;
@@ -776,8 +781,8 @@ int gpio_generic_chip_init(struct gpio_generic_chip *chip,
 	if (ret)
 		return ret;
 
-	ret = gpio_mmio_setup_accessors(dev, chip,
-				    flags & GPIO_GENERIC_BIG_ENDIAN_BYTE_ORDER);
+	ret = gpio_mmio_setup_accessors(
+		dev, chip, flags & GPIO_GENERIC_BIG_ENDIAN_BYTE_ORDER);
 	if (ret)
 		return ret;
 
@@ -793,7 +798,7 @@ int gpio_generic_chip_init(struct gpio_generic_chip *chip,
 
 	chip->sdata = chip->read_reg(chip->reg_dat);
 	if (gc->set == gpio_mmio_set_set &&
-			!(flags & GPIO_GENERIC_UNREADABLE_REG_SET))
+	    !(flags & GPIO_GENERIC_UNREADABLE_REG_SET))
 		chip->sdata = chip->read_reg(chip->reg_set);
 
 	if (flags & GPIO_GENERIC_UNREADABLE_REG_DIR)
