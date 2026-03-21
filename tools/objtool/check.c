@@ -197,7 +197,8 @@ static bool is_rust_noreturn(const struct symbol *func)
 	 * as well as changes to the source code itself between versions (since
 	 * these come from the Rust standard library).
 	 */
-	return str_ends_with(func->name, "_4core3num22from_ascii_radix_panic")				||
+	return str_ends_with(func->name, "_4core3num20from_str_radix_panic")				||
+	       str_ends_with(func->name, "_4core3num22from_ascii_radix_panic")				||
 	       str_ends_with(func->name, "_4core5sliceSp15copy_from_slice17len_mismatch_fail")		||
 	       str_ends_with(func->name, "_4core6option13expect_failed")				||
 	       str_ends_with(func->name, "_4core6option13unwrap_failed")				||
@@ -3693,7 +3694,7 @@ static void checksum_update_insn(struct objtool_file *file, struct symbol *func,
 static int validate_branch(struct objtool_file *file, struct symbol *func,
 			   struct instruction *insn, struct insn_state state);
 static int do_validate_branch(struct objtool_file *file, struct symbol *func,
-			      struct instruction *insn, struct insn_state state);
+			      struct instruction *insn, struct insn_state *state);
 
 static int validate_insn(struct objtool_file *file, struct symbol *func,
 			 struct instruction *insn, struct insn_state *statep,
@@ -3958,7 +3959,7 @@ static int validate_insn(struct objtool_file *file, struct symbol *func,
  * tools/objtool/Documentation/objtool.txt.
  */
 static int do_validate_branch(struct objtool_file *file, struct symbol *func,
-			      struct instruction *insn, struct insn_state state)
+			      struct instruction *insn, struct insn_state *state)
 {
 	struct instruction *next_insn, *prev_insn = NULL;
 	bool dead_end;
@@ -3989,7 +3990,7 @@ static int do_validate_branch(struct objtool_file *file, struct symbol *func,
 			return 1;
 		}
 
-		ret = validate_insn(file, func, insn, &state, prev_insn, next_insn,
+		ret = validate_insn(file, func, insn, state, prev_insn, next_insn,
 				    &dead_end);
 
 		if (!insn->trace) {
@@ -4000,7 +4001,7 @@ static int do_validate_branch(struct objtool_file *file, struct symbol *func,
 		}
 
 		if (!dead_end && !next_insn) {
-			if (state.cfi.cfa.base == CFI_UNDEFINED)
+			if (state->cfi.cfa.base == CFI_UNDEFINED)
 				return 0;
 			if (file->ignore_unreachables)
 				return 0;
@@ -4025,7 +4026,7 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 	int ret;
 
 	trace_depth_inc();
-	ret = do_validate_branch(file, func, insn, state);
+	ret = do_validate_branch(file, func, insn, &state);
 	trace_depth_dec();
 
 	return ret;
