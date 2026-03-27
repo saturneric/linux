@@ -32,33 +32,33 @@ static const unsigned char sht3x_cmd_measure_single_mpm[] = { 0x24, 0x0b };
 static const unsigned char sht3x_cmd_measure_single_lpm[] = { 0x24, 0x16 };
 
 /* commands for periodic mode */
-static const unsigned char sht3x_cmd_measure_periodic_mode[]   = { 0xe0, 0x00 };
-static const unsigned char sht3x_cmd_break[]                   = { 0x30, 0x93 };
+static const unsigned char sht3x_cmd_measure_periodic_mode[] = { 0xe0, 0x00 };
+static const unsigned char sht3x_cmd_break[] = { 0x30, 0x93 };
 
 /* commands for heater control */
-static const unsigned char sht3x_cmd_heater_on[]               = { 0x30, 0x6d };
-static const unsigned char sht3x_cmd_heater_off[]              = { 0x30, 0x66 };
+static const unsigned char sht3x_cmd_heater_on[] = { 0x30, 0x6d };
+static const unsigned char sht3x_cmd_heater_off[] = { 0x30, 0x66 };
 
 /* other commands */
-static const unsigned char sht3x_cmd_read_status_reg[]         = { 0xf3, 0x2d };
-static const unsigned char sht3x_cmd_clear_status_reg[]        = { 0x30, 0x41 };
-static const unsigned char sht3x_cmd_read_serial_number[]      = { 0x37, 0x80 };
+static const unsigned char sht3x_cmd_read_status_reg[] = { 0xf3, 0x2d };
+static const unsigned char sht3x_cmd_clear_status_reg[] = { 0x30, 0x41 };
+static const unsigned char sht3x_cmd_read_serial_number[] = { 0x37, 0x80 };
 
 /* delays for single-shot mode i2c commands, both in us */
-#define SHT3X_SINGLE_WAIT_TIME_HPM  15000
-#define SHT3X_SINGLE_WAIT_TIME_MPM   6000
-#define SHT3X_SINGLE_WAIT_TIME_LPM   4000
+#define SHT3X_SINGLE_WAIT_TIME_HPM 15000
+#define SHT3X_SINGLE_WAIT_TIME_MPM 6000
+#define SHT3X_SINGLE_WAIT_TIME_LPM 4000
 
-#define SHT3X_WORD_LEN         2
-#define SHT3X_CMD_LENGTH       2
-#define SHT3X_CRC8_LEN         1
-#define SHT3X_RESPONSE_LENGTH  6
-#define SHT3X_CRC8_POLYNOMIAL  0x31
-#define SHT3X_CRC8_INIT        0xFF
-#define SHT3X_MIN_TEMPERATURE  -45000
-#define SHT3X_MAX_TEMPERATURE  130000
-#define SHT3X_MIN_HUMIDITY     0
-#define SHT3X_MAX_HUMIDITY     100000
+#define SHT3X_WORD_LEN 2
+#define SHT3X_CMD_LENGTH 2
+#define SHT3X_CRC8_LEN 1
+#define SHT3X_RESPONSE_LENGTH 6
+#define SHT3X_CRC8_POLYNOMIAL 0x31
+#define SHT3X_CRC8_INIT 0xFF
+#define SHT3X_MIN_TEMPERATURE -45000
+#define SHT3X_MAX_TEMPERATURE 130000
+#define SHT3X_MIN_HUMIDITY 0
+#define SHT3X_MAX_HUMIDITY 100000
 
 enum sht3x_chips {
 	sht3x,
@@ -83,43 +83,43 @@ DECLARE_CRC8_TABLE(sht3x_crc8_table);
 /* periodic measure commands (high repeatability mode) */
 static const char periodic_measure_commands_hpm[][SHT3X_CMD_LENGTH] = {
 	/* 0.5 measurements per second */
-	{0x20, 0x32},
+	{ 0x20, 0x32 },
 	/* 1 measurements per second */
-	{0x21, 0x30},
+	{ 0x21, 0x30 },
 	/* 2 measurements per second */
-	{0x22, 0x36},
+	{ 0x22, 0x36 },
 	/* 4 measurements per second */
-	{0x23, 0x34},
+	{ 0x23, 0x34 },
 	/* 10 measurements per second */
-	{0x27, 0x37},
+	{ 0x27, 0x37 },
 };
 
 /* periodic measure commands (medium repeatability) */
 static const char periodic_measure_commands_mpm[][SHT3X_CMD_LENGTH] = {
 	/* 0.5 measurements per second */
-	{0x20, 0x24},
+	{ 0x20, 0x24 },
 	/* 1 measurements per second */
-	{0x21, 0x26},
+	{ 0x21, 0x26 },
 	/* 2 measurements per second */
-	{0x22, 0x20},
+	{ 0x22, 0x20 },
 	/* 4 measurements per second */
-	{0x23, 0x22},
+	{ 0x23, 0x22 },
 	/* 10 measurements per second */
-	{0x27, 0x21},
+	{ 0x27, 0x21 },
 };
 
 /* periodic measure commands (low repeatability mode) */
 static const char periodic_measure_commands_lpm[][SHT3X_CMD_LENGTH] = {
 	/* 0.5 measurements per second */
-	{0x20, 0x2f},
+	{ 0x20, 0x2f },
 	/* 1 measurements per second */
-	{0x21, 0x2d},
+	{ 0x21, 0x2d },
 	/* 2 measurements per second */
-	{0x22, 0x2b},
+	{ 0x22, 0x2b },
 	/* 4 measurements per second */
-	{0x23, 0x29},
+	{ 0x23, 0x29 },
 	/* 10 measurements per second */
-	{0x27, 0x2a},
+	{ 0x27, 0x2a },
 };
 
 struct sht3x_limit_commands {
@@ -129,34 +129,29 @@ struct sht3x_limit_commands {
 
 static const struct sht3x_limit_commands limit_commands[] = {
 	/* temp1_max, humidity1_max */
-	[limit_max] = { {0xe1, 0x1f}, {0x61, 0x1d} },
+	[limit_max] = { { 0xe1, 0x1f }, { 0x61, 0x1d } },
 	/* temp_1_max_hyst, humidity1_max_hyst */
-	[limit_max_hyst] = { {0xe1, 0x14}, {0x61, 0x16} },
+	[limit_max_hyst] = { { 0xe1, 0x14 }, { 0x61, 0x16 } },
 	/* temp1_min, humidity1_min */
-	[limit_min] = { {0xe1, 0x02}, {0x61, 0x00} },
+	[limit_min] = { { 0xe1, 0x02 }, { 0x61, 0x00 } },
 	/* temp_1_min_hyst, humidity1_min_hyst */
-	[limit_min_hyst] = { {0xe1, 0x09}, {0x61, 0x0B} },
+	[limit_min_hyst] = { { 0xe1, 0x09 }, { 0x61, 0x0B } },
 };
 
-#define SHT3X_NUM_LIMIT_CMD  ARRAY_SIZE(limit_commands)
+#define SHT3X_NUM_LIMIT_CMD ARRAY_SIZE(limit_commands)
 
 static const u16 mode_to_update_interval[] = {
-	   0,
-	2000,
-	1000,
-	 500,
-	 250,
-	 100,
+	0, 2000, 1000, 500, 250, 100,
 };
 
-static const struct hwmon_channel_info * const sht3x_channel_info[] = {
+static const struct hwmon_channel_info *const sht3x_channel_info[] = {
 	HWMON_CHANNEL_INFO(chip, HWMON_C_UPDATE_INTERVAL),
 	HWMON_CHANNEL_INFO(temp, HWMON_T_INPUT | HWMON_T_MIN |
-				HWMON_T_MIN_HYST | HWMON_T_MAX |
-				HWMON_T_MAX_HYST | HWMON_T_ALARM),
+					 HWMON_T_MIN_HYST | HWMON_T_MAX |
+					 HWMON_T_MAX_HYST | HWMON_T_ALARM),
 	HWMON_CHANNEL_INFO(humidity, HWMON_H_INPUT | HWMON_H_MIN |
-				HWMON_H_MIN_HYST | HWMON_H_MAX |
-				HWMON_H_MAX_HYST | HWMON_H_ALARM),
+					     HWMON_H_MIN_HYST | HWMON_H_MAX |
+					     HWMON_H_MAX_HYST | HWMON_H_ALARM),
 	NULL,
 };
 
@@ -168,8 +163,8 @@ struct sht3x_data {
 
 	u8 mode;
 	const unsigned char *command;
-	u32 wait_time;			/* in us*/
-	unsigned long last_update;	/* last update in periodic mode*/
+	u32 wait_time; /* in us*/
+	unsigned long last_update; /* last update in periodic mode*/
 	enum sht3x_repeatability repeatability;
 	u32 serial_number;
 
@@ -202,8 +197,7 @@ static u8 get_mode_from_update_interval(u16 value)
 }
 
 static int sht3x_read_from_command(struct i2c_client *client,
-				   struct sht3x_data *data,
-				   const char *command,
+				   struct sht3x_data *data, const char *command,
 				   char *buf, int length, u32 wait_time)
 {
 	int ret;
@@ -363,9 +357,7 @@ static int humidity1_limit_read(struct device *dev, int index)
 /*
  * limit_write must only be called with data_lock held
  */
-static size_t limit_write(struct device *dev,
-			  u8 index,
-			  int temperature,
+static size_t limit_write(struct device *dev, u8 index, int temperature,
 			  u32 humidity)
 {
 	char buffer[SHT3X_CMD_LENGTH + SHT3X_WORD_LEN + SHT3X_CRC8_LEN];
@@ -391,10 +383,8 @@ static size_t limit_write(struct device *dev,
 
 	*((__be16 *)position) = cpu_to_be16(raw);
 	position += SHT3X_WORD_LEN;
-	*position = crc8(sht3x_crc8_table,
-			 position - SHT3X_WORD_LEN,
-			 SHT3X_WORD_LEN,
-			 SHT3X_CRC8_INIT);
+	*position = crc8(sht3x_crc8_table, position - SHT3X_WORD_LEN,
+			 SHT3X_WORD_LEN, SHT3X_CRC8_INIT);
 
 	mutex_lock(&data->i2c_lock);
 	ret = i2c_master_send(client, buffer, sizeof(buffer));
@@ -415,8 +405,8 @@ static int temp1_limit_write(struct device *dev, int index, int val)
 	int ret;
 	struct sht3x_data *data = dev_get_drvdata(dev);
 
-	temperature = clamp_val(val, SHT3X_MIN_TEMPERATURE,
-				SHT3X_MAX_TEMPERATURE);
+	temperature =
+		clamp_val(val, SHT3X_MIN_TEMPERATURE, SHT3X_MAX_TEMPERATURE);
 	mutex_lock(&data->data_lock);
 	ret = limit_write(dev, index, temperature,
 			  data->humidity_limits[index]);
@@ -453,7 +443,7 @@ static void sht3x_select_command(struct sht3x_data *data)
 		if (data->repeatability == high_repeatability) {
 			data->command = sht3x_cmd_measure_single_hpm;
 			data->wait_time = SHT3X_SINGLE_WAIT_TIME_HPM;
-		} else if (data->repeatability ==  medium_repeatability) {
+		} else if (data->repeatability == medium_repeatability) {
 			data->command = sht3x_cmd_measure_single_mpm;
 			data->wait_time = SHT3X_SINGLE_WAIT_TIME_MPM;
 		} else {
@@ -463,8 +453,7 @@ static void sht3x_select_command(struct sht3x_data *data)
 	}
 }
 
-static int status_register_read(struct device *dev,
-				char *buffer, int length)
+static int status_register_read(struct device *dev, char *buffer, int length)
 {
 	int ret;
 	struct sht3x_data *data = dev_get_drvdata(dev);
@@ -503,8 +492,7 @@ static int humidity1_alarm_read(struct device *dev)
 }
 
 static ssize_t heater_enable_show(struct device *dev,
-				  struct device_attribute *attr,
-				  char *buf)
+				  struct device_attribute *attr, char *buf)
 {
 	char buffer[SHT3X_WORD_LEN + SHT3X_CRC8_LEN];
 	int ret;
@@ -519,8 +507,7 @@ static ssize_t heater_enable_show(struct device *dev,
 
 static ssize_t heater_enable_store(struct device *dev,
 				   struct device_attribute *attr,
-				   const char *buf,
-				   size_t count)
+				   const char *buf, size_t count)
 {
 	struct sht3x_data *data = dev_get_drvdata(dev);
 	struct i2c_client *client = data->client;
@@ -612,8 +599,7 @@ out:
 }
 
 static ssize_t repeatability_show(struct device *dev,
-				  struct device_attribute *attr,
-				  char *buf)
+				  struct device_attribute *attr, char *buf)
 {
 	struct sht3x_data *data = dev_get_drvdata(dev);
 
@@ -622,8 +608,7 @@ static ssize_t repeatability_show(struct device *dev,
 
 static ssize_t repeatability_store(struct device *dev,
 				   struct device_attribute *attr,
-				   const char *buf,
-				   size_t count)
+				   const char *buf, size_t count)
 {
 	int ret;
 	u8 val;
@@ -647,8 +632,7 @@ static SENSOR_DEVICE_ATTR_RW(repeatability, repeatability, 0);
 
 static struct attribute *sht3x_attrs[] = {
 	&sensor_dev_attr_heater_enable.dev_attr.attr,
-	&sensor_dev_attr_repeatability.dev_attr.attr,
-	NULL
+	&sensor_dev_attr_repeatability.dev_attr.attr, NULL
 };
 
 ATTRIBUTE_GROUPS(sht3x);
@@ -848,8 +832,7 @@ static void sht3x_serial_number_read(struct sht3x_data *data)
 	struct i2c_client *client = data->client;
 
 	ret = sht3x_read_from_command(client, data,
-				      sht3x_cmd_read_serial_number,
-				      buffer,
+				      sht3x_cmd_read_serial_number, buffer,
 				      SHT3X_RESPONSE_LENGTH, 0);
 	if (ret)
 		return;
@@ -857,7 +840,8 @@ static void sht3x_serial_number_read(struct sht3x_data *data)
 	data->serial_number = (buffer[0] << 24) | (buffer[1] << 16) |
 			      (buffer[3] << 8) | buffer[4];
 
-	debugfs_create_u32("serial_number", 0444, client->debugfs, &data->serial_number);
+	debugfs_create_u32("serial_number", 0444, client->debugfs,
+			   &data->serial_number);
 }
 
 static const struct hwmon_ops sht3x_ops = {
@@ -919,8 +903,8 @@ static int sht3x_probe(struct i2c_client *client)
 	if (ret)
 		return ret;
 
-	hwmon_dev = devm_hwmon_device_register_with_info(dev, client->name, data,
-							 &sht3x_chip_info, sht3x_groups);
+	hwmon_dev = devm_hwmon_device_register_with_info(
+		dev, client->name, data, &sht3x_chip_info, sht3x_groups);
 	if (IS_ERR(hwmon_dev))
 		return PTR_ERR(hwmon_dev);
 
@@ -929,19 +913,18 @@ static int sht3x_probe(struct i2c_client *client)
 	return 0;
 }
 
-static const struct of_device_id sht3x_of_ids[] = {
-	{ .compatible = "sensirion,sht3x" },
-	{ .compatible = "sensirion,sts3x" },
-	{}
-};
-MODULE_DEVICE_TABLE(of, sht3x_of_ids);
+/* device ID table */
+static const struct i2c_device_id sht3x_ids[] = { { "sht3x", sht3x },
+						  { "sts3x", sts3x },
+						  { "sht85", sht3x },
+						  {} };
+
+MODULE_DEVICE_TABLE(i2c, sht3x_ids);
 
 static struct i2c_driver sht3x_i2c_driver = {
-	.driver = {
-		.name = "sht3x",
-		.of_match_table = sht3x_of_ids,
-	},
-	.probe       = sht3x_probe,
+	.driver.name = "sht3x",
+	.probe = sht3x_probe,
+	.id_table = sht3x_ids,
 };
 module_i2c_driver(sht3x_i2c_driver);
 

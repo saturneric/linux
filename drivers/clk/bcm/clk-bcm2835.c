@@ -1411,7 +1411,7 @@ static struct clk_hw *bcm2835_register_pll(struct bcm2835_cprman *cprman,
 	if (!bcm2835_clk_is_claimed(pll_data->name))
 		init.flags |= CLK_IS_CRITICAL;
 
-	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+	pll = kzalloc_obj(*pll);
 	if (!pll)
 		return NULL;
 
