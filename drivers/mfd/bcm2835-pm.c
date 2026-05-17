@@ -71,18 +71,9 @@ static int bcm2835_pm_get_pdata(struct platform_device *pdev,
 
 static int bcm2835_pm_probe(struct platform_device *pdev)
 {
-	const struct of_device_id *of_id;
 	struct device *dev = &pdev->dev;
 	struct bcm2835_pm *pm;
-	bool is_2712;
 	int ret;
-
-	of_id = of_match_node(bcm2835_pm_of_match, pdev->dev.of_node);
-	if (!of_id) {
-		dev_err(&pdev->dev, "Failed to match compatible string\n");
-		return -EINVAL;
-	}
-	is_2712 = !!of_id->data;
 
 	pm = devm_kzalloc(dev, sizeof(*pm), GFP_KERNEL);
 	if (!pm)
@@ -113,6 +104,7 @@ static int bcm2835_pm_probe(struct platform_device *pdev)
 					    NULL, 0, NULL);
 	return 0;
 }
+
 
 static const struct of_device_id bcm2835_pm_of_match[] = {
 	{ .compatible = "brcm,bcm2835-pm-wdt", },
