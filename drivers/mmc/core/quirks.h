@@ -67,27 +67,28 @@ static const struct mmc_fixup __maybe_unused mmc_sd_fixups[] = {
 	 * Samsung Pro Plus/EVO Plus/Pro Ultimate SD cards (2023) claim to cache
 	 * flush OK, but become unresponsive afterwards.
 	 */
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SAMSUNG_SD, 0x534d, 2023, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SAMSUNG_SD, 0x534d, 2023,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
 	/*
 	 * Early Sandisk Extreme and Extreme Pro A2 cards never finish SD cache
 	 * flush in CQ mode. Latest card date this was seen on is 10/2020.
 	 */
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2019, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2019,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2020, CID_MONTH_ANY,
-		   0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, 2020,
+		   CID_MONTH_ANY, 0, -1ull, SDIO_ANY_ID, SDIO_ANY_ID,
+		   add_quirk_sd, MMC_QUIRK_BROKEN_SD_CACHE, EXT_CSD_REV_ANY),
 
 	/* SD A2 allow-list - only trust CQ on these cards */
 	/* Raspberry Pi A2 cards */
-	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_LONGSYS_SD, 0x4c53, CID_YEAR_ANY, CID_MONTH_ANY,
-		   cid_rev(1, 0, 0, 0), -1ull, SDIO_ANY_ID, SDIO_ANY_ID, add_quirk_sd,
-		   MMC_QUIRK_WORKING_SD_CQ, EXT_CSD_REV_ANY),
+	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_LONGSYS_SD, 0x4c53, CID_YEAR_ANY,
+		   CID_MONTH_ANY, cid_rev(1, 0, 0, 0), -1ull, SDIO_ANY_ID,
+		   SDIO_ANY_ID, add_quirk_sd, MMC_QUIRK_WORKING_SD_CQ,
+		   EXT_CSD_REV_ANY),
 
 	END_FIXUP
 };
@@ -193,7 +194,16 @@ static const struct mmc_fixup __maybe_unused mmc_blk_fixups[] = {
 		  MMC_QUIRK_TRIM_BROKEN),
 
 	/*
-	 * Some SD cards reports discard support while they don't
+	 * On Some Kingston eMMCs, secure erase/trim time is independent
+	 * of erase size, fixed at approximately 2 seconds.
+	 */
+	MMC_FIXUP("IY2964", CID_MANFID_KINGSTON, 0x0100, add_quirk_mmc,
+		  MMC_QUIRK_FIXED_SECURE_ERASE_TRIM_TIME),
+	MMC_FIXUP("IB2932", CID_MANFID_KINGSTON, 0x0100, add_quirk_mmc,
+		  MMC_QUIRK_FIXED_SECURE_ERASE_TRIM_TIME),
+
+	/*
+	 * Some SD cards reports discard support while they don't 
 	 */
 	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, add_quirk_sd,
 		  MMC_QUIRK_BROKEN_SD_DISCARD),
@@ -231,6 +241,9 @@ static const struct mmc_fixup __maybe_unused mmc_ext_csd_fixups[] = {
 	 */
 	MMC_FIXUP_EXT_CSD_REV(CID_NAME_ANY, CID_MANFID_NUMONYX, 0x014e,
 			      add_quirk, MMC_QUIRK_BROKEN_HPI, 6),
+
+	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_SANDISK_MMC, CID_OEMID_ANY,
+		  add_quirk_mmc, MMC_QUIRK_BROKEN_MDT),
 
 	END_FIXUP
 };
@@ -274,14 +287,9 @@ static const struct mmc_fixup __maybe_unused sdio_card_init_methods[] = {
 static inline bool mmc_fixup_of_compatible_match(struct mmc_card *card,
 						 const char *compatible)
 {
-	struct device_node *np;
-
-	for_each_child_of_node(mmc_dev(card->host)->of_node, np) {
-		if (of_device_is_compatible(np, compatible)) {
-			of_node_put(np);
+	for_each_child_of_node_scoped(mmc_dev(card->host)->of_node, np)
+		if (of_device_is_compatible(np, compatible))
 			return true;
-		}
-	}
 
 	return false;
 }
