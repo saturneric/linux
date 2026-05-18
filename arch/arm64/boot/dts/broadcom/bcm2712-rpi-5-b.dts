@@ -26,11 +26,7 @@
 	/* Will be filled by the bootloader */
 	memory@0 {
 		device_type = "memory";
-#ifndef FIRMWARE_UPDATED
-		reg = <0 0 0x28000000>;
-#else
 		reg = <0 0 0 0x28000000>;
-#endif
 	};
 
 	leds: leds {
@@ -181,10 +177,6 @@ rp1_target: &pcie2 {
 };
 
 &rp1_eth {
-	assigned-clocks = <&rp1_clocks RP1_CLK_ETH_TSU>,
-			  <&rp1_clocks RP1_CLK_ETH>;
-	assigned-clock-rates = <50000000>,
-			       <125000000>;
 	status = "okay";
 	phy-handle = <&phy1>;
 	phy-reset-gpios = <&rp1_gpio 32 GPIO_ACTIVE_LOW>;
@@ -193,8 +185,6 @@ rp1_target: &pcie2 {
 	phy1: ethernet-phy@1 {
 		reg = <0x1>;
 		brcm,powerdown-enable;
-		eee-broken-1000t;
-		eee-broken-100tx;
 	};
 };
 
@@ -203,37 +193,6 @@ rp1_target: &pcie2 {
  */
 &uart10 {
 	status = "okay";
-};
-
-&rp1_gpio {
-	usb_vbus_default_state: usb-vbus-default-state {
-		function = "vbus1";
-		groups = "vbus1";
-	};
-
-	rp1_i2c4_default_state: rp1-i2c4-default-state {
-		function = "i2c4";
-		groups = "i2c4_2";
-		drive-strength = <12>;
-		bias-pull-up;
-	};
-
-	rp1_i2c6_default_state: rp1-i2c6-default-state {
-		function = "i2c6";
-		groups = "i2c6_0";
-		drive-strength = <12>;
-		bias-pull-up;
-	};
-};
-
-&rp1_i2c4 {
-	pinctrl-0 = <&rp1_i2c4_default_state>;
-	pinctrl-names = "default";
-};
-
-&rp1_i2c6 {
-	pinctrl-0 = <&rp1_i2c6_default_state>;
-	pinctrl-names = "default";
 };
 
 gpio: &rp1_gpio {
@@ -807,7 +766,6 @@ spi10_cs_pins: &spi10_cs_gpio1 {};
 };
 
 &pcie1 {
-	status = "okay";
 	brcm,clkreq-mode = "safe";
 };
 

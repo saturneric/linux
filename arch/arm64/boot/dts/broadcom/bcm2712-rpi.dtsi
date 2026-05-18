@@ -2,6 +2,8 @@
 
 #include <dt-bindings/power/raspberrypi-power.h>
 
+#define DMA_FLAG_HEAVY       (1 << 8)
+
 &soc {
 	firmware: firmware {
 		compatible = "raspberrypi,bcm2835-firmware", "simple-mfd";
@@ -35,13 +37,11 @@
 	fb: fb {
 		compatible = "brcm,bcm2708-fb";
 		firmware = <&firmware>;
-		status = "okay";
 	};
 
 	rpi_rtc: rpi_rtc {
 		compatible = "raspberrypi,rpi-rtc";
 		firmware = <&firmware>;
-		status = "okay";
 		trickle-charge-microvolt = <0>;
 	};
 
@@ -54,28 +54,24 @@
 			compatible = "raspberrypi,rpi-otp";
 			firmware = <&firmware>;
 			reg = <0 192>;
-			status = "okay";
 		};
 
 		nvmem_cust: nvmem_cust {
 			compatible = "raspberrypi,rpi-otp";
 			firmware = <&firmware>;
 			reg = <1 8>;
-			status = "okay";
 		};
 
 		nvmem_mac: nvmem_mac {
 			compatible = "raspberrypi,rpi-otp";
 			firmware = <&firmware>;
 			reg = <2 6>;
-			status = "okay";
 		};
 
 		nvmem_priv: nvmem_priv {
 			compatible = "raspberrypi,rpi-otp";
 			firmware = <&firmware>;
 			reg = <3 16>;
-			status = "okay";
 		};
 	};
 
@@ -97,13 +93,27 @@
 	};
 };
 
+&rp1_dma {
+	snps,chan-flags = <DMA_FLAG_HEAVY DMA_FLAG_HEAVY 0 0 0 0 0 0>;
+};
+
 pio: &rp1_pio {
+	dmas = <&rp1_dma (RP1_DMA_PIO_CH0_TX | DMA_FLAG_HEAVY)>,
+		<&rp1_dma (RP1_DMA_PIO_CH0_RX | DMA_FLAG_HEAVY)>,
+		<&rp1_dma (RP1_DMA_PIO_CH1_TX | DMA_FLAG_HEAVY)>,
+		<&rp1_dma (RP1_DMA_PIO_CH1_RX | DMA_FLAG_HEAVY)>,
+		<&rp1_dma (RP1_DMA_PIO_CH2_TX | DMA_FLAG_HEAVY)>,
+		<&rp1_dma (RP1_DMA_PIO_CH2_RX | DMA_FLAG_HEAVY)>,
+		<&rp1_dma (RP1_DMA_PIO_CH3_TX | DMA_FLAG_HEAVY)>,
+		<&rp1_dma (RP1_DMA_PIO_CH3_RX | DMA_FLAG_HEAVY)>;
 	status = "okay";
 };
 
+watchdog: &pm {};
+
 / {
 	chosen: chosen {
-		bootargs = "reboot=w coherent_pool=1M 8250.nr_uarts=1 pci=pcie_bus_safe cgroup_disable=memory numa_policy=interleave";
+		bootargs = "reboot=w coherent_pool=1M 8250.nr_uarts=1 pci=pcie_bus_safe cgroup_disable=memory numa_policy=interleave nvme.max_host_mem_size_mb=32";
 		stdout-path = "serial10:115200n8";
 	};
 
@@ -155,6 +165,7 @@ pio: &rp1_pio {
 		uart4 = &uart4;
 		usb0 = &rp1_usb0;
 		usb1 = &rp1_usb1;
+		watchdog = &watchdog;
 		wifi0 = &wifi;
 	};
 
@@ -178,8 +189,11 @@ pio: &rp1_pio {
 		drm_fb2_rp1_dsi0 = <&aliases>, "drm-fb2=",&dsi0;
 		drm_fb2_rp1_dsi1 = <&aliases>, "drm-fb2=",&dsi1;
 		drm_fb2_vc4 = <&aliases>, "drm-fb2=",&vc4;
+		eee = <&phy1>,"eee-broken-1000t!",
+		      <&phy1>,"eee-broken-100tx!";
 		eth_led0 = <&phy1>,"led-modes:0";
 		eth_led1 = <&phy1>,"led-modes:4";
+		eth_max_speed = <&phy1>,"max-speed:0";
 		fan_temp0 = <&cpu_tepid>,"temperature:0";
 		fan_temp0_hyst = <&cpu_tepid>,"hysteresis:0";
 		fan_temp0_speed = <&fan>, "cooling-levels:4";
@@ -226,6 +240,12 @@ pio: &rp1_pio {
 		suspend = <&pwr_key>, "linux,code:0=205";
 		uart0 = <&uart0>, "status";
 		uart0_console = <&uart0>,"status", <&aliases>, "console=",&uart0;
+		uart0_dma = <&uart0>,"dmas:0=",<&rp1_dma>,
+			    <&uart0>,"dmas:4=",<RP1_DMA_UART0_TX>,
+			    <&uart0>,"dmas:8=",<&rp1_dma>,
+			    <&uart0>,"dmas:12=",<RP1_DMA_UART0_RX>,
+			    <&uart0>,"dma-names[=747800727800"; // "tx", "rx"
+		watchdog = <&watchdog>, "early-watchdog?";
 		wifiaddr = <&wifi>, "local-mac-address[";
 
 		cam0_reg = <&cam0_reg>,"status";
@@ -279,7 +299,7 @@ pciex4: &pcie2 { };
 		compatible = "raspberrypi,bootloader-config", "nvmem-rmem";
 		#address-cells = <1>;
 		#size-cells = <1>;
-		reg = <0x0 0x0 0x0>;
+		reg = <0x0 0x0 0x0 0x0>;
 		no-map;
 		status = "disabled";
 	};
@@ -291,7 +311,7 @@ pciex4: &pcie2 { };
 		compatible = "raspberrypi,bootloader-public-key", "nvmem-rmem";
 		#address-cells = <1>;
 		#size-cells = <1>;
-		reg = <0x0 0x0 0x0>;
+		reg = <0x0 0x0 0x0 0x0>;
 		no-map;
 		status = "disabled";
 	};

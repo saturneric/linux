@@ -4,25 +4,6 @@
 #include "bcm2712.dtsi"
 
 / {
-#ifndef FIRMWARE_UPDATED
-	#size-cells = <1>;
-
-	reserved-memory {
-		ranges;
-		#address-cells = <2>;
-		#size-cells = <1>;
-
-		atf@0 {
-			reg = <0x0 0x0 0x80000>;
-		};
-
-		linux,cma {
-			size = <0x4000000>; /* 64MB */
-			alloc-ranges = <0x0 0x00000000 0x40000000>;
-		};
-	};
-#endif
-
 	arm-pmu {
 		compatible = "arm,cortex-a76-pmu";
 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
@@ -143,7 +124,7 @@
 	};
 
 	pinctrl: pinctrl@7d504100 {
-		compatible = "brcm,bcm2712-pinctrl";
+		compatible = "brcm,bcm2712c0-pinctrl";
 		reg = <0x7d504100 0x30>;
 
 		uarta_24_pins: uarta_24_pins {
@@ -213,7 +194,7 @@
 	};
 
 	pinctrl_aon: pinctrl@7d510700 {
-		compatible = "brcm,bcm2712-aon-pinctrl";
+		compatible = "brcm,bcm2712c0-aon-pinctrl";
 		reg = <0x7d510700 0x20>;
 
 		i2c3_m4_agpio0_pins: i2c3_m4_agpio0_pins {
@@ -430,7 +411,7 @@
 };
 
 &uart10 {
-	compatible = "arm,pl011-axi";
+	compatible = "arm,pl011-axi", "arm,pl011", "arm,primecell";
 };
 
 &aon_intr {
@@ -487,6 +468,7 @@
 };
 
 &pcie1 {
+	status = "disabled";
 	ranges =
 		/* 2GiB, 32-bit, non-prefetchable at PCIe 00_80000000 */
 		<0x02000000 0x00 0x80000000 0x1b 0x80000000 0x00 0x80000000>,
@@ -495,5 +477,6 @@
 };
 
 &pcie2 {
+	status = "disabled";
 	brcm,vdm-qos-map = /bits/ 8 <8 8 8 9 10 10 11 11>;
 };
