@@ -1336,11 +1336,11 @@ static void dwc3_set_axi_pipe_limit(struct dwc3 *dwc)
 		dev_err(dev, "Invalid axi_pipe_limit property\n");
 		return;
 	}
-	cfg = dwc3_readl(dwc->regs, DWC3_GSBUSCFG1);
+	cfg = dwc3_readl(dwc, DWC3_GSBUSCFG1);
 	cfg &= ~DWC3_GSBUSCFG1_PIPETRANSLIMIT(15);
 	cfg |= DWC3_GSBUSCFG1_PIPETRANSLIMIT(dwc->axi_pipe_limit - 1);
 
-	dwc3_writel(dwc->regs, DWC3_GSBUSCFG1, cfg);
+	dwc3_writel(dwc, DWC3_GSBUSCFG1, cfg);
 }
 
 /**
