@@ -69,15 +69,6 @@ static int bcm2835_pm_get_pdata(struct platform_device *pdev,
 	return 0;
 }
 
-static const struct of_device_id bcm2835_pm_of_match[] = {
-	{ .compatible = "brcm,bcm2835-pm-wdt", },
-	{ .compatible = "brcm,bcm2835-pm", },
-	{ .compatible = "brcm,bcm2711-pm", },
-	{ .compatible = "brcm,bcm2712-pm", .data = (const void *)1},
-	{},
-};
-MODULE_DEVICE_TABLE(of, bcm2835_pm_of_match);
-
 static int bcm2835_pm_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *of_id;
@@ -121,6 +112,15 @@ static int bcm2835_pm_probe(struct platform_device *pdev)
 					    NULL, 0, NULL);
 	return 0;
 }
+
+static const struct of_device_id bcm2835_pm_of_match[] = {
+	{ .compatible = "brcm,bcm2835-pm-wdt", },
+	{ .compatible = "brcm,bcm2835-pm", },
+	{ .compatible = "brcm,bcm2711-pm", },
+	{ .compatible = "brcm,bcm2712-pm", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, bcm2835_pm_of_match);
 
 static struct platform_driver bcm2835_pm_driver = {
 	.probe		= bcm2835_pm_probe,
