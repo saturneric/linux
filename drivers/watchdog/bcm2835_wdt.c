@@ -169,19 +169,9 @@ static struct watchdog_device bcm2835_wdt_wdd = {
 static int bcm2835_power_off(struct sys_off_data *data)
 {
 	struct bcm2835_wdt *wdt = data->cb_data;
-	u32 val;
 
-	/*
-	 * We set the watchdog hard reset bit here to distinguish this reset
-	 * from the normal (full) reset. bootcode.bin will not reboot after a
-	 * hard reset.
-	 */
-	val = readl_relaxed(wdt->base + PM_RSTS);
-	val |= PM_PASSWORD | PM_RSTS_RASPBERRYPI_HALT;
-	writel_relaxed(val, wdt->base + PM_RSTS);
-
-	/* Continue with normal reset mechanism */
-	__bcm2835_restart(wdt);
+	/* Partition 63 tells the firmware that this is a halt */
+	__bcm2835_restart(wdt, 63);
 
 	return NOTIFY_DONE;
 }
